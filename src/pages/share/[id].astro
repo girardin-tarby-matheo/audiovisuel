@@ -1,0 +1,35 @@
+---
+import Layout from "../../layouts/Layout.astro";
+
+export function getStaticPaths() {
+  // Static placeholder — actual share IDs are handled client-side
+  return [{ params: { id: "preview" } }];
+}
+
+const { id } = Astro.params;
+---
+
+<Layout title={`Partage ${id} — Shotboard Studio`}>
+  <main
+    class="flex min-h-screen flex-col items-center justify-center bg-ink-950 px-6 text-center text-slate-200"
+  >
+    <div class="animate-fade-in">
+      <p class="text-[10px] uppercase tracking-[0.24em] text-amber-200/80">
+        Shotboard Studio
+      </p>
+      <h1 class="mt-3 text-3xl font-semibold text-white">
+        Lien de partage simulé
+      </h1>
+      <p class="mt-3 max-w-md text-sm leading-relaxed text-slate-400">
+        Le plateau <span class="font-mono text-cyan-200">{id}</span> a été généré
+        localement. Dans une version connectée, ce lien ouvrirait le plan de tournage
+        collaboratif.
+      </p>
+      <a
+        href="/"
+        class="mt-8 inline-block rounded-xl bg-amber-300 px-4 py-2 text-sm font-medium text-ink-950 transition hover:bg-amber-200"
+        >Retour au studio</a
+      >
+    </div>
+  </main>
+</Layout>
