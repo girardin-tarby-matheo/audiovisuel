@@ -86,6 +86,29 @@ export function CanvasBoard() {
   const panRef = useRef<{ pointerId: number; startX: number; startY: number; origin: CameraView } | null>(null);
   const panActive = tool === "pan" || spacePan;
 
+  // Auto-center canvas on initial load
+  useEffect(() => {
+    const board = boardRef.current;
+    if (!board || items.length === 0) return;
+    const currentCam = useStudio.getState().camera;
+    if (currentCam.x === 80 && currentCam.y === 40) {
+      const xs = items.map((i) => i.x);
+      const ys = items.map((i) => i.y);
+      const minX = Math.min(...xs) - 80;
+      const maxX = Math.max(...xs) + 80;
+      const minY = Math.min(...ys) - 80;
+      const maxY = Math.max(...ys) + 80;
+      const w = board.clientWidth || 900;
+      const h = board.clientHeight || 700;
+      const zoom = Math.min(1.15, Math.max(0.65, Math.min(w / (maxX - minX), h / (maxY - minY)) * 0.9));
+      setCamera({
+        zoom,
+        x: w / 2 - ((minX + maxX) / 2) * zoom,
+        y: h / 2 - ((minY + maxY) / 2) * zoom,
+      });
+    }
+  }, [items.length, setCamera]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const down = (event: KeyboardEvent) => {

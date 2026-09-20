@@ -4,6 +4,7 @@ import { SynopticBoard } from "./SynopticBoard";
 import { PropertiesPanel } from "./PropertiesPanel";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
+import { CatalogManagerModal } from "./CatalogManagerModal";
 import { useStudio } from "../store/studioStore";
 import { Clapperboard, MousePointer2, Hand, Download, ArrowRight } from "lucide-react";
 
@@ -12,7 +13,7 @@ function WelcomeOverlay({ onDismiss }: { onDismiss: () => void }) {
     <div className="animate-fade-in fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm">
       <div
         className="mx-4 max-w-lg rounded-3xl border border-white/10 bg-gradient-to-b from-[#13161f] to-[#0c0e14] p-8 shadow-2xl"
-        style={{ animation: "scale-in 350ms cubic-bezier(0.34, 1.56, 0.64, 1) both" }}
+        style={{ animation: "modal-in 350ms cubic-bezier(0.16, 1, 0.3, 1) both" }}
       >
         <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-300/20 to-cyan-300/10">
           <Clapperboard size={28} className="text-amber-200" />
@@ -49,10 +50,26 @@ function WelcomeOverlay({ onDismiss }: { onDismiss: () => void }) {
   );
 }
 
-function ToastBar({ message }: { message: string }) {
-  const isSuccess = message.includes("copié") || message.includes("téléchargé") || message.includes("Export");
+function ToastBar({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  const isSuccess =
+    message.includes("copié") ||
+    message.includes("téléchargé") ||
+    message.includes("Export") ||
+    message.includes("✓");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onDismiss();
+    }, 2800);
+    return () => clearTimeout(timer);
+  }, [message, onDismiss]);
+
   return (
-    <div className="toast-in pointer-events-none absolute bottom-20 left-1/2 z-50 -translate-x-1/2">
+    <div
+      onClick={onDismiss}
+      className="toast-in pointer-events-auto cursor-pointer absolute bottom-20 left-1/2 z-50 -translate-x-1/2 select-none transition-transform hover:scale-105 active:scale-95"
+      title="Cliquer pour fermer"
+    >
       <div className="flex items-center gap-2.5 overflow-hidden rounded-2xl border border-white/10 bg-[#12161f]/95 px-4 py-2.5 shadow-2xl backdrop-blur-md">
         {isSuccess ? (
           <svg width="16" height="16" viewBox="0 0 16 16" className="shrink-0 text-emerald-400">
@@ -76,7 +93,7 @@ function ToastBar({ message }: { message: string }) {
       <div className="mx-auto mt-1 h-0.5 w-3/4 overflow-hidden rounded-full bg-white/10">
         <div
           className="h-full rounded-full bg-amber-300/60"
-          style={{ animation: "progress-shrink 2.4s linear both" }}
+          style={{ animation: "progress-shrink 2.8s linear both" }}
         />
       </div>
     </div>
@@ -85,6 +102,7 @@ function ToastBar({ message }: { message: string }) {
 
 export default function StudioApp() {
   const toast = useStudio((s) => s.toast);
+  const setToast = useStudio((s) => s.setToast);
   const viewMode = useStudio((s) => s.viewMode);
   const [showWelcome, setShowWelcome] = useState(false);
 
@@ -112,7 +130,8 @@ export default function StudioApp() {
           <SynopticBoard />
         )}
       </div>
-      {toast && <ToastBar message={toast} />}
+      <CatalogManagerModal />
+      {toast && <ToastBar message={toast} onDismiss={() => setToast(null)} />}
       {showWelcome && <WelcomeOverlay onDismiss={dismissWelcome} />}
     </div>
   );

@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback, type PointerEvent as ReactPointerEvent } from "react";
 import { ItemGlyph } from "./ItemGlyph";
+import { VisualAsset } from "./VisualAsset";
 import { CATALOG_MAP } from "../lib/catalog";
 import type { BoardObject } from "../lib/types";
 
@@ -344,8 +345,8 @@ export function BoardNode({ item, selected, panActive, zoom, onSelect, onMove, o
           }
         }}
         className={`drag-surface relative flex h-full w-full flex-col items-center justify-center border transition-all duration-200 ${item.category === "set"
-            ? "rounded-xl backdrop-blur-sm"
-            : "node-marker rounded-full"
+          ? "rounded-xl backdrop-blur-sm"
+          : "node-marker rounded-full"
           } ${selected
             ? "border-amber-300/70 bg-[#10141c]/92 shadow-[0_0_0_1px_rgba(245,185,66,0.3),0_12px_40px_rgba(0,0,0,0.35)]"
             : item.category === "set"
@@ -370,9 +371,15 @@ export function BoardNode({ item, selected, panActive, zoom, onSelect, onMove, o
           }}
         />
 
-        <span className={item.category === "camera" && item.catalogId !== "cam-drone" ? "-rotate-90" : undefined}>
-          <ItemGlyph category={item.category} catalogId={item.catalogId} color={item.color} size={item.category === "set" ? 28 : 22} />
-        </span>
+        <VisualAsset
+          visualKey={item.visualKey ?? item.catalogId}
+          image={item.image}
+          fit={item.fit}
+          background={item.background}
+          alt={item.name}
+          className={item.category === "camera" && item.catalogId !== "cam-drone" ? "-rotate-90" : undefined}
+          fallback={<ItemGlyph category={item.category} catalogId={item.catalogId} color={item.color} size={item.category === "set" ? 28 : 22} />}
+        />
         {item.category === "set" && (
           <span className="mt-1 font-mono text-[9px] tracking-[0.18em] text-white/70">{item.label}</span>
         )}

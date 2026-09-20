@@ -104,6 +104,19 @@ export function TopBar() {
 
         <button
           type="button"
+          onClick={() => {
+            useStudio.getState().setEditingCatalogItemId(null);
+            useStudio.getState().setCatalogModalOpen(true);
+          }}
+          className="flex items-center gap-1.5 rounded-xl border border-white/8 bg-white/5 px-2.5 py-2 text-xs text-amber-200 hover:bg-white/10 hover:border-amber-400/30 transition"
+          title="Personnaliser les objets & la bibliothèque"
+        >
+          <span className="text-amber-300">✨</span>
+          <span className="hidden sm:inline">Objets</span>
+        </button>
+
+        <button
+          type="button"
           onClick={resetBoard}
           className="rounded-xl border border-white/8 p-2 text-slate-400 transition-all hover:rotate-[-45deg] hover:text-white"
           title="Réinitialiser le plateau"

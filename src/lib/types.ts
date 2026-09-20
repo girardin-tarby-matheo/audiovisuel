@@ -32,6 +32,16 @@ export type CatalogItem = {
   short: string;
   description: string;
   color: string;
+  visualKey?: string;
+  image?: string;
+  fit?: "contain" | "cover" | "fill";
+  background?: string;
+  isCustom?: boolean;
+  portsIn?: SynopticPort[];
+  portsOut?: SynopticPort[];
+  needsPower?: boolean;
+  warningBadge?: string;
+  deviceType?: SynopticDeviceType;
   defaults: {
     fov?: number;
     beamRadius?: number;
@@ -58,10 +68,19 @@ export type BoardObject = {
   width?: number;
   height?: number;
   color: string;
+  visualKey?: string;
+  image?: string;
+  fit?: "contain" | "cover" | "fill";
+  background?: string;
   fov: number;
   beamRadius: number;
   beamSpread: number;
   intensity: number;
+  portsIn?: SynopticPort[];
+  portsOut?: SynopticPort[];
+  needsPower?: boolean;
+  warningBadge?: string;
+  deviceType?: SynopticDeviceType;
 };
 
 export type CameraView = {
@@ -78,6 +97,8 @@ export type SynopticNode = {
   category?: Category;
   deviceType: SynopticDeviceType;
   color: string;
+  visualKey?: string;
+  image?: string;
   x: number;
   y: number;
   width?: number;
@@ -98,4 +119,3 @@ export type SynopticLink = {
   cableType: CableType;
   label?: string;
 };
-

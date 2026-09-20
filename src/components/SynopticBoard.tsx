@@ -20,6 +20,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { useStudio } from "../store/studioStore";
+import { VisualAsset } from "./VisualAsset";
 import type { CableType, SynopticDeviceType, SynopticNode, SynopticPort } from "../lib/types";
 
 export const CABLE_COLORS: Record<CableType, { color: string; label: string; bg: string }> = {
@@ -682,7 +683,12 @@ function DeviceNodeCard({
 
         {/* Visuel central de l'équipement */}
         <div className="flex flex-1 flex-col items-center justify-center p-2 text-slate-400">
-          <DeviceIllustration deviceType={node.deviceType ?? "generic"} />
+          <VisualAsset
+            visualKey={node.visualKey ?? node.deviceType ?? "generic"}
+            image={node.image}
+            alt={node.title}
+            fallback={<DeviceIllustration deviceType={node.deviceType ?? "generic"} />}
+          />
           {node.warningBadge && (
             <div className="mt-2 flex items-center gap-1 rounded bg-red-100 px-1.5 py-0.5 text-[8.5px] font-bold text-red-700">
               <AlertTriangle size={10} />

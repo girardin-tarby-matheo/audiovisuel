@@ -1,7 +1,8 @@
 import { useState, useMemo, type ReactNode } from "react";
-import { Hand, MousePointer2, Minus, Plus, Maximize2, Search, X } from "lucide-react";
-import { CATALOG, CATEGORIES } from "../lib/catalog";
+import { Hand, MousePointer2, Minus, Plus, Maximize2, Search, X, Sparkles, SlidersHorizontal } from "lucide-react";
+import { CATEGORIES } from "../lib/catalog";
 import { ItemGlyph } from "./ItemGlyph";
+import { VisualAsset } from "./VisualAsset";
 import { useStudio } from "../store/studioStore";
 
 export function Sidebar() {
@@ -9,20 +10,24 @@ export function Sidebar() {
   const camera = useStudio((s) => s.camera);
   const selectedId = useStudio((s) => s.selectedId);
   const items = useStudio((s) => s.items);
+  const catalog = useStudio((s) => s.catalog);
+  const setCatalogModalOpen = useStudio((s) => s.setCatalogModalOpen);
+  const setEditingCatalogItemId = useStudio((s) => s.setEditingCatalogItemId);
+
   const [search, setSearch] = useState("");
   const [addedId, setAddedId] = useState<string | null>(null);
 
   const query = search.toLowerCase().trim();
 
   const filtered = useMemo(() => {
-    if (!query) return CATALOG;
-    return CATALOG.filter(
+    if (!query) return catalog;
+    return catalog.filter(
       (item) =>
         item.name.toLowerCase().includes(query) ||
         item.short.toLowerCase().includes(query) ||
         item.description.toLowerCase().includes(query),
     );
-  }, [query]);
+  }, [catalog, query]);
 
   const categoryCount = useMemo(() => {
     const map: Record<string, number> = {};
@@ -48,18 +53,36 @@ export function Sidebar() {
 
   return (
     <aside className="panel-glass flex w-[280px] shrink-0 flex-col">
-      <div className="border-b border-white/6 px-4 py-4">
-        <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-cyan-200/70">Bibliothèque</p>
-        <h2 className="mt-1 text-sm font-semibold text-white">Éléments de tournage</h2>
-        <p className="mt-1 text-xs text-slate-400">Glissez sur le plateau ou cliquez pour poser au centre.</p>
-        <div className="relative mt-3">
+      <div className="border-b border-white/6 px-4 py-3.5 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-cyan-200/70">Bibliothèque</p>
+            <h2 className="text-sm font-semibold text-white">Éléments de tournage</h2>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setEditingCatalogItemId(null);
+              setCatalogModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 rounded-xl border border-amber-400/30 bg-amber-400/10 px-2.5 py-1.5 text-[11px] font-semibold text-amber-200 hover:bg-amber-400/20 hover:border-amber-400/50 transition active:scale-95"
+            title="Personnaliser les photos, noms et paramètres des objets"
+          >
+            <Sparkles size={13} className="text-amber-300" />
+            <span>Personnaliser</span>
+          </button>
+        </div>
+
+        <p className="text-[11px] text-slate-400 leading-tight">Glissez sur le plateau ou cliquez pour poser au centre.</p>
+
+        <div className="relative">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
           <input
             aria-label="Rechercher un élément de tournage"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Rechercher un élément…"
-            className="field pl-8 pr-8 text-xs"
+            className="field pl-8 pr-8 text-xs py-1.5"
           />
           {search && (
             <button
@@ -104,15 +127,22 @@ export function Sidebar() {
                     }}
                     onClick={() => placeAtView(item.id)}
                     className={`group relative rounded-xl border bg-white/[0.03] p-2.5 text-left transition-all duration-200 hover:border-amber-300/30 hover:bg-white/[0.06] hover:shadow-lg hover:shadow-black/20 active:scale-[0.97] ${addedId === item.id
-                        ? "border-emerald-400/40 bg-emerald-400/[0.06]"
-                        : "border-white/8"
+                      ? "border-emerald-400/40 bg-emerald-400/[0.06]"
+                      : "border-white/8"
                       }`}
                     style={{ animationDelay: `${index * 30}ms` }}
                   >
-                    <div className="mb-2 flex h-10 items-center justify-center rounded-lg bg-black/25 transition-colors group-hover:bg-black/35">
-                      <ItemGlyph category={item.category} catalogId={item.id} color={item.color} />
+                    <div className="mb-2 flex h-10 items-center justify-center rounded-lg bg-black/25 transition-colors group-hover:bg-black/35 overflow-hidden relative">
+                      <VisualAsset
+                        visualKey={item.visualKey ?? item.id}
+                        image={item.image}
+                        fit={item.fit}
+                        background={item.background}
+                        alt={item.name}
+                        fallback={<ItemGlyph category={item.category} catalogId={item.id} color={item.color} size={22} />}
+                      />
                     </div>
-                    <p className="text-[12px] font-medium leading-tight text-slate-100">{item.name}</p>
+                    <p className="text-[12px] font-medium leading-tight text-slate-100 truncate">{item.name}</p>
                     <p className="mt-0.5 font-mono text-[9px] tracking-widest text-slate-500">{item.short}</p>
                     {addedId === item.id && (
                       <div className="absolute inset-0 rounded-xl border-2 border-emerald-400/50" style={{ animation: "pulse-ring 500ms ease forwards" }} />
@@ -214,8 +244,8 @@ function ToolBtn({
         aria-pressed={active}
         onClick={onClick}
         className={`rounded-xl p-2.5 transition-all duration-180 ${active
-            ? "bg-amber-300/15 text-amber-200 shadow-inner"
-            : "text-slate-300 hover:bg-white/6 hover:text-white active:scale-95"
+          ? "bg-amber-300/15 text-amber-200 shadow-inner"
+          : "text-slate-300 hover:bg-white/6 hover:text-white active:scale-95"
           }`}
       >
         {children}
