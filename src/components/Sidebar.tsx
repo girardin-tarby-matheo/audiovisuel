@@ -55,6 +55,7 @@ export function Sidebar() {
         <div className="relative mt-3">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
           <input
+            aria-label="Rechercher un élément de tournage"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Rechercher un élément…"
@@ -64,6 +65,7 @@ export function Sidebar() {
             <button
               type="button"
               onClick={() => setSearch("")}
+              aria-label="Effacer la recherche"
               className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 transition hover:text-white"
             >
               <X size={13} />
@@ -208,6 +210,8 @@ function ToolBtn({
       <button
         type="button"
         title={label}
+        aria-label={label}
+        aria-pressed={active}
         onClick={onClick}
         className={`rounded-xl p-2.5 transition-all duration-180 ${active
             ? "bg-amber-300/15 text-amber-200 shadow-inner"

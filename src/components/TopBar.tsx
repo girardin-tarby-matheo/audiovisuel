@@ -1,24 +1,18 @@
 import { useState, useCallback } from "react";
-import { Download, Share2, Clapperboard, RotateCcw, Loader2, Check } from "lucide-react";
+import { Download, Share2, Clapperboard, RotateCcw, Loader2, Check, LayoutDashboard, Network } from "lucide-react";
 import { toPng } from "html-to-image";
-import type { BoardStatus } from "../lib/types";
 import { useStudio } from "../store/studioStore";
-
-const STATUSES: { id: BoardStatus; label: string; tone: string }[] = [
-  { id: "draft", label: "Brouillon", tone: "bg-slate-500/20 text-slate-300" },
-  { id: "prep", label: "Préparation", tone: "bg-amber-400/15 text-amber-200" },
-  { id: "shooting", label: "Tournage", tone: "bg-cyan-400/15 text-cyan-200" },
-  { id: "locked", label: "Verrouillé", tone: "bg-violet-400/15 text-violet-200" },
-];
 
 type ActionState = "idle" | "busy" | "done";
 
 export function TopBar() {
   const title = useStudio((s) => s.title);
-  const status = useStudio((s) => s.status);
+  const viewMode = useStudio((s) => s.viewMode);
+  const synopticNodes = useStudio((s) => s.synopticNodes);
   const items = useStudio((s) => s.items);
   const setTitle = useStudio((s) => s.setTitle);
-  const setStatus = useStudio((s) => s.setStatus);
+  const setViewMode = useStudio((s) => s.setViewMode);
+  const generateSynoptic = useStudio((s) => s.generateSynoptic);
   const setToast = useStudio((s) => s.setToast);
   const resetBoard = useStudio((s) => s.resetBoard);
 
@@ -55,12 +49,12 @@ export function TopBar() {
       const dataUrl = await toPng(node, {
         cacheBust: true,
         pixelRatio: 2,
-        backgroundColor: "#0b0e15",
+        backgroundColor: viewMode === "synoptic" ? "#ffffff" : "#0b0e15",
         filter: (element) => !(element instanceof HTMLElement && element.classList.contains("no-export")),
       });
       const link = document.createElement("a");
       const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-      link.download = `${slug || "shotboard"}.png`;
+      link.download = `${slug || "shotboard"}-${viewMode}.png`;
       link.href = dataUrl;
       link.click();
       setToast("Export PNG téléchargé ✓");
@@ -99,20 +93,13 @@ export function TopBar() {
           <span className="tooltip-text">Éléments sur le plateau</span>
         </div>
 
-        <div className="flex rounded-xl border border-white/8 bg-white/[0.03] p-0.5">
-          {STATUSES.map((entry) => (
-            <button
-              key={entry.id}
-              type="button"
-              onClick={() => setStatus(entry.id)}
-              className={`rounded-lg px-2.5 py-1.5 text-[11px] transition-all duration-200 ${status === entry.id
-                  ? `${entry.tone} scale-[1.02] shadow-sm`
-                  : "text-slate-500 hover:text-slate-300"
-                }`}
-            >
-              {entry.label}
-            </button>
-          ))}
+        <div className="flex rounded-xl border border-white/8 bg-white/[0.03] p-0.5" aria-label="Mode de travail">
+          <button type="button" onClick={() => setViewMode("plan")} aria-pressed={viewMode === "plan"} className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] transition-all ${viewMode === "plan" ? "bg-amber-400/15 text-amber-200 shadow-sm" : "text-slate-500 hover:text-slate-300"}`}>
+            <LayoutDashboard size={13} /> Plan
+          </button>
+          <button type="button" onClick={() => { if (!synopticNodes.length) generateSynoptic(); else setViewMode("synoptic"); }} aria-pressed={viewMode === "synoptic"} className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] transition-all ${viewMode === "synoptic" ? "bg-violet-400/15 text-violet-200 shadow-sm" : "text-slate-500 hover:text-slate-300"}`}>
+            <Network size={13} /> Synoptique
+          </button>
         </div>
 
         <button
@@ -129,8 +116,8 @@ export function TopBar() {
           onClick={share}
           disabled={shareState !== "idle"}
           className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-all duration-200 ${shareState === "done"
-              ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
-              : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/8"
+            ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
+            : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/8"
             }`}
         >
           {shareState === "busy" ? (
@@ -148,10 +135,10 @@ export function TopBar() {
           onClick={exportPng}
           disabled={exportState !== "idle"}
           className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200 ${exportState === "done"
-              ? "bg-emerald-400/90 text-ink-950"
-              : exportState === "busy"
-                ? "bg-amber-300/60 text-ink-950"
-                : "bg-amber-300/90 text-ink-950 hover:bg-amber-200 hover:shadow-lg hover:shadow-amber-300/20"
+            ? "bg-emerald-400/90 text-ink-950"
+            : exportState === "busy"
+              ? "bg-amber-300/60 text-ink-950"
+              : "bg-amber-300/90 text-ink-950 hover:bg-amber-200 hover:shadow-lg hover:shadow-amber-300/20"
             }`}
         >
           {exportState === "busy" ? (

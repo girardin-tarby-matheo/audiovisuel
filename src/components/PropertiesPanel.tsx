@@ -1,6 +1,7 @@
 import { useRef, useEffect, type ReactNode } from "react";
 import { Trash2, Info } from "lucide-react";
 import { ItemGlyph } from "./ItemGlyph";
+import { CATALOG_MAP } from "../lib/catalog";
 import { useStudio } from "../store/studioStore";
 
 export function PropertiesPanel() {
@@ -9,6 +10,7 @@ export function PropertiesPanel() {
   const updateItem = useStudio((s) => s.updateItem);
   const removeItem = useStudio((s) => s.removeItem);
   const item = items.find((entry) => entry.id === selectedId) ?? null;
+  const catalogDefaults = item ? CATALOG_MAP[item.catalogId]?.defaults : undefined;
   const contentRef = useRef<HTMLDivElement>(null);
 
   // Animate content transition when selection changes
@@ -111,6 +113,30 @@ export function PropertiesPanel() {
             unit="×"
             onChange={(v) => updateItem(item.id, { scale: v })}
           />
+          {item.category === "set" && (
+            <>
+              <SliderField
+                label="Largeur"
+                value={item.width ?? catalogDefaults?.width ?? 100}
+                min={40}
+                max={800}
+                step={1}
+                unit=" px"
+                onChange={(v) => updateItem(item.id, { width: v })}
+                accent="violet"
+              />
+              <SliderField
+                label="Hauteur"
+                value={item.height ?? catalogDefaults?.height ?? 100}
+                min={40}
+                max={800}
+                step={1}
+                unit=" px"
+                onChange={(v) => updateItem(item.id, { height: v })}
+                accent="violet"
+              />
+            </>
+          )}
         </div>
 
         {/* Color */}
@@ -243,10 +269,10 @@ function SliderField({
   step: number;
   unit: string;
   onChange: (value: number) => void;
-  accent?: "cyan" | "amber";
+  accent?: "cyan" | "amber" | "violet";
 }) {
   const displayValue = step < 1 ? value.toFixed(2) : Math.round(value);
-  const accentColor = accent === "cyan" ? "text-cyan-200" : accent === "amber" ? "text-amber-200" : "text-slate-200";
+  const accentColor = accent === "cyan" ? "text-cyan-200" : accent === "amber" ? "text-amber-200" : accent === "violet" ? "text-violet-200" : "text-slate-200";
 
   return (
     <div>

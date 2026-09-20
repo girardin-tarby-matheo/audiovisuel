@@ -83,6 +83,43 @@ input[type="range"]:active::-webkit-slider-thumb {
   transition: outline-color 200ms;
 }
 
+.drag-surface {
+  touch-action: none;
+  user-select: none;
+}
+
+.drag-surface:focus-visible {
+  outline: 2px solid rgb(245 185 66 / 0.9);
+  outline-offset: 3px;
+}
+
+.node-marker {
+  box-shadow: 0 5px 14px rgb(0 0 0 / 0.24), inset 0 1px 0 rgb(255 255 255 / 0.08);
+}
+
+.node-marker:hover {
+  transform: scale(1.06);
+}
+
+.control-handle {
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+  transition: transform 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
+}
+
+.control-handle:hover,
+.control-handle:focus-visible {
+  background-color: rgb(245 185 66 / 0.2);
+  box-shadow: 0 0 0 4px rgb(245 185 66 / 0.12), 0 6px 16px rgb(0 0 0 / 0.35);
+  outline: none;
+}
+
+.control-handle:active {
+  cursor: grabbing;
+  transform: translateX(-50%) scale(1.12);
+}
+
 .grid-floor.drop-hover {
   outline: 2px dashed rgb(245 185 66 / 0.45);
   outline-offset: -4px;
@@ -91,6 +128,50 @@ input[type="range"]:active::-webkit-slider-thumb {
     linear-gradient(90deg, rgb(245 185 66 / 0.04) 1px, transparent 1px),
     radial-gradient(circle at 50% 40%, rgb(245 185 66 / 0.08), transparent 42%);
   background-size: 48px 48px, 48px 48px, 100% 100%;
+}
+
+.synoptic-floor {
+  background-color: #0b0e15;
+  background-image: linear-gradient(rgb(167 139 250 / 0.045) 1px, transparent 1px), linear-gradient(90deg, rgb(167 139 250 / 0.045) 1px, transparent 1px), radial-gradient(circle at 50% 35%, rgb(167 139 250 / 0.08), transparent 44%);
+  background-size: 48px 48px, 48px 48px, 100% 100%;
+}
+
+.synoptic-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid rgb(167 139 250 / 0.2);
+  border-radius: 0.75rem;
+  background: rgb(167 139 250 / 0.08);
+  padding: 0.45rem 0.7rem;
+  color: rgb(221 214 254 / 0.86);
+  font-size: 0.7rem;
+  transition: background-color 160ms, border-color 160ms;
+}
+
+.synoptic-action:hover {
+  border-color: rgb(167 139 250 / 0.45);
+  background: rgb(167 139 250 / 0.16);
+}
+
+.synoptic-node {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.synoptic-node:active {
+  cursor: grabbing;
+}
+
+.synoptic-node:focus-visible {
+  outline: 2px solid rgb(196 181 253 / 0.9);
+  outline-offset: 3px;
+}
+
+.synoptic-node:hover button,
+.synoptic-node:focus-within button {
+  opacity: 1;
 }
 
 /* ── Glass panels ── */

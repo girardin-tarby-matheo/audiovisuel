@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { CanvasBoard } from "./CanvasBoard";
+import { SynopticBoard } from "./SynopticBoard";
 import { PropertiesPanel } from "./PropertiesPanel";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
@@ -84,6 +85,7 @@ function ToastBar({ message }: { message: string }) {
 
 export default function StudioApp() {
   const toast = useStudio((s) => s.toast);
+  const viewMode = useStudio((s) => s.viewMode);
   const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
@@ -100,9 +102,15 @@ export default function StudioApp() {
     <div className="flex h-full min-h-screen flex-col bg-ink-950 text-slate-100">
       <TopBar />
       <div className="flex min-h-0 flex-1">
-        <Sidebar />
-        <CanvasBoard />
-        <PropertiesPanel />
+        {viewMode === "plan" ? (
+          <>
+            <Sidebar />
+            <CanvasBoard />
+            <PropertiesPanel />
+          </>
+        ) : (
+          <SynopticBoard />
+        )}
       </div>
       {toast && <ToastBar message={toast} />}
       {showWelcome && <WelcomeOverlay onDismiss={dismissWelcome} />}

@@ -3,6 +3,7 @@ import type { DragEvent, PointerEvent as ReactPointerEvent } from "react";
 import { BoardNode } from "./BoardNode";
 import { BottomToolbar } from "./Sidebar";
 import { screenToWorld, useStudio } from "../store/studioStore";
+import type { CameraView } from "../lib/types";
 
 function Minimap() {
   const items = useStudio((s) => s.items);
@@ -77,10 +78,12 @@ export function CanvasBoard() {
   const select = useStudio((s) => s.select);
   const addFromCatalog = useStudio((s) => s.addFromCatalog);
   const moveItem = useStudio((s) => s.moveItem);
+  const updateItem = useStudio((s) => s.updateItem);
   const removeItem = useStudio((s) => s.removeItem);
   const setTool = useStudio((s) => s.setTool);
 
   const [isDragOver, setIsDragOver] = useState(false);
+  const panRef = useRef<{ pointerId: number; startX: number; startY: number; origin: CameraView } | null>(null);
   const panActive = tool === "pan" || spacePan;
 
   // Keyboard shortcuts
@@ -147,26 +150,25 @@ export function CanvasBoard() {
         return;
       }
       event.preventDefault();
-      const startX = event.clientX;
-      const startY = event.clientY;
-      const origin = { ...useStudio.getState().camera };
       event.currentTarget.setPointerCapture(event.pointerId);
-      const move = (ev: PointerEvent) => {
-        setCamera({
-          ...origin,
-          x: origin.x + (ev.clientX - startX),
-          y: origin.y + (ev.clientY - startY),
-        });
-      };
-      const up = () => {
-        window.removeEventListener("pointermove", move);
-        window.removeEventListener("pointerup", up);
-      };
-      window.addEventListener("pointermove", move);
-      window.addEventListener("pointerup", up);
+      panRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, origin: { ...useStudio.getState().camera } };
     },
     [panActive, select, setCamera],
   );
+
+  const onPointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const pan = panRef.current;
+    if (!pan || pan.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    setCamera({ ...pan.origin, x: pan.origin.x + event.clientX - pan.startX, y: pan.origin.y + event.clientY - pan.startY });
+  }, [setCamera]);
+
+  const finishPan = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const pan = panRef.current;
+    if (!pan || pan.pointerId !== event.pointerId) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    panRef.current = null;
+  }, []);
 
   // Drop handling
   const onDrop = useCallback(
@@ -199,6 +201,10 @@ export function CanvasBoard() {
         data-zoom={camera.zoom}
         id="board-export"
         onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={finishPan}
+        onPointerCancel={finishPan}
+        onLostPointerCapture={finishPan}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
@@ -223,6 +229,7 @@ export function CanvasBoard() {
               zoom={camera.zoom}
               onSelect={select}
               onMove={moveItem}
+              onUpdate={updateItem}
               onRemove={removeItem}
             />
           ))}

@@ -247,7 +247,7 @@ export const CATALOG: CatalogItem[] = [
     short: "TBL",
     description: "Mobilier de plateau (interview, bureau)",
     color: "#d6d3d1",
-    defaults: { rotation: 0, scale: 1.15 },
+    defaults: { rotation: 0, scale: 1.15, width: 180, height: 100 },
   },
   {
     id: "set-chair",
@@ -256,7 +256,7 @@ export const CATALOG: CatalogItem[] = [
     short: "CHS",
     description: "Siège pour talent ou invité",
     color: "#e7e5e4",
-    defaults: { rotation: 0, scale: 1 },
+    defaults: { rotation: 0, scale: 1, width: 96, height: 96 },
   },
   {
     id: "set-cyc",
@@ -265,7 +265,7 @@ export const CATALOG: CatalogItem[] = [
     short: "CYC",
     description: "Fond infini studio ou délimitation de pièce",
     color: "#94a3b8",
-    defaults: { rotation: 0, scale: 1.3 },
+    defaults: { rotation: 0, scale: 1.3, width: 280, height: 48 },
   },
   {
     id: "set-monitor",
@@ -274,7 +274,25 @@ export const CATALOG: CatalogItem[] = [
     short: "MON",
     description: "Station de contrôle vidéo",
     color: "#22d3ee",
-    defaults: { rotation: 0, scale: 1 },
+    defaults: { rotation: 0, scale: 1, width: 110, height: 68 },
+  },
+  {
+    id: "set-atem-mini",
+    category: "set",
+    name: "Mélangeur ATEM Mini",
+    short: "ATEM",
+    description: "Mélangeur vidéo de régie",
+    color: "#f59e0b",
+    defaults: { rotation: 0, scale: 0.85, width: 150, height: 72 },
+  },
+  {
+    id: "set-sound-desk",
+    category: "set",
+    name: "Table son",
+    short: "SON",
+    description: "Console de mixage audio de régie",
+    color: "#60a5fa",
+    defaults: { rotation: 0, scale: 1, width: 170, height: 84 },
   },
 ];
 
