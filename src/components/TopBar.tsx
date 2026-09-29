@@ -1,11 +1,11 @@
 import { useState, useCallback } from "react";
-import { Download, Share2, Clapperboard, RotateCcw, Loader2, Check, LayoutDashboard, Network } from "lucide-react";
+import { Download, Share2, Clapperboard, RotateCcw, Loader2, Check, LayoutDashboard, Network, FolderOpen } from "lucide-react";
 import { toPng } from "html-to-image";
 import { useStudio } from "../store/studioStore";
 
 type ActionState = "idle" | "busy" | "done";
 
-export function TopBar() {
+export function TopBar({ onOpenProjects }: { onOpenProjects: () => void }) {
   const title = useStudio((s) => s.title);
   const viewMode = useStudio((s) => s.viewMode);
   const synopticNodes = useStudio((s) => s.synopticNodes);
@@ -15,15 +15,17 @@ export function TopBar() {
   const generateSynoptic = useStudio((s) => s.generateSynoptic);
   const setToast = useStudio((s) => s.setToast);
   const resetBoard = useStudio((s) => s.resetBoard);
+  const exportProject = useStudio((s) => s.exportProject);
 
   const [shareState, setShareState] = useState<ActionState>("idle");
   const [exportState, setExportState] = useState<ActionState>("idle");
+  const totalPower = items.reduce((total, item) => total + (item.specs?.powerWatts ?? 0), 0);
+  const totalWeight = items.reduce((total, item) => total + (item.specs?.weightKg ?? 0), 0);
 
   const share = useCallback(async () => {
     if (shareState !== "idle") return;
     setShareState("busy");
-    const id = crypto.randomUUID().slice(0, 8);
-    const url = `${window.location.origin}/share/${id}`;
+    const url = `${window.location.origin}/share/preview?data=${encodeURIComponent(exportProject())}`;
     try {
       await navigator.clipboard.writeText(url);
       setToast(`Lien copié · ${url}`);
@@ -35,7 +37,7 @@ export function TopBar() {
       setShareState("idle");
       setToast(null);
     }, 2600);
-  }, [shareState, setToast]);
+  }, [shareState, exportProject, setToast]);
 
   const exportPng = useCallback(async () => {
     if (exportState !== "idle") return;
@@ -48,7 +50,7 @@ export function TopBar() {
     try {
       const dataUrl = await toPng(node, {
         cacheBust: true,
-        pixelRatio: 2,
+        pixelRatio: 3,
         backgroundColor: viewMode === "synoptic" ? "#ffffff" : "#0b0e15",
         filter: (element) => !(element instanceof HTMLElement && element.classList.contains("no-export")),
       });
@@ -92,6 +94,9 @@ export function TopBar() {
           </span>
           <span className="tooltip-text">Éléments sur le plateau</span>
         </div>
+        <div className="hidden text-[10px] text-slate-500 lg:block" title="Charge calculée à partir des fiches techniques">
+          {totalPower > 0 ? `${totalPower} W` : "— W"} · {totalWeight > 0 ? `${totalWeight.toFixed(1)} kg` : "— kg"}
+        </div>
 
         <div className="flex rounded-xl border border-white/8 bg-white/[0.03] p-0.5" aria-label="Mode de travail">
           <button type="button" onClick={() => setViewMode("plan")} aria-pressed={viewMode === "plan"} className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] transition-all ${viewMode === "plan" ? "bg-amber-400/15 text-amber-200 shadow-sm" : "text-slate-500 hover:text-slate-300"}`}>
@@ -101,6 +106,16 @@ export function TopBar() {
             <Network size={13} /> Synoptique
           </button>
         </div>
+
+        <button
+          type="button"
+          onClick={onOpenProjects}
+          className="rounded-xl border border-white/8 p-2 text-slate-400 transition hover:bg-white/8 hover:text-white"
+          title="Gérer les projets"
+          aria-label="Gérer les projets"
+        >
+          <FolderOpen size={16} />
+        </button>
 
         <button
           type="button"

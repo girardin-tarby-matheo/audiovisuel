@@ -5,6 +5,7 @@ import { PropertiesPanel } from "./PropertiesPanel";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { CatalogManagerModal } from "./CatalogManagerModal";
+import { ProjectManagerModal } from "./ProjectManagerModal";
 import { useStudio } from "../store/studioStore";
 import { Clapperboard, MousePointer2, Hand, Download, ArrowRight } from "lucide-react";
 
@@ -105,6 +106,7 @@ export default function StudioApp() {
   const setToast = useStudio((s) => s.setToast);
   const viewMode = useStudio((s) => s.viewMode);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [showProjects, setShowProjects] = useState(false);
 
   useEffect(() => {
     const seen = localStorage.getItem("shotboard-welcome-seen");
@@ -118,7 +120,7 @@ export default function StudioApp() {
 
   return (
     <div className="flex h-full min-h-screen flex-col bg-ink-950 text-slate-100">
-      <TopBar />
+      <TopBar onOpenProjects={() => setShowProjects(true)} />
       <div className="flex min-h-0 flex-1">
         {viewMode === "plan" ? (
           <>
@@ -127,10 +129,14 @@ export default function StudioApp() {
             <PropertiesPanel />
           </>
         ) : (
-          <SynopticBoard />
+          <>
+            <Sidebar />
+            <SynopticBoard />
+          </>
         )}
       </div>
       <CatalogManagerModal />
+      {showProjects && <ProjectManagerModal onClose={() => setShowProjects(false)} />}
       {toast && <ToastBar message={toast} onDismiss={() => setToast(null)} />}
       {showWelcome && <WelcomeOverlay onDismiss={dismissWelcome} />}
     </div>

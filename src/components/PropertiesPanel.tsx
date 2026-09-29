@@ -82,6 +82,15 @@ export function PropertiesPanel() {
           />
         </Field>
 
+        <Field label="Calque">
+          <select value={item.layer} onChange={(e) => updateItem(item.id, { layer: e.target.value as typeof item.layer })} className="field">
+            <option value="video">Vidéo</option>
+            <option value="audio">Audio</option>
+            <option value="accessories">Accessoires</option>
+            <option value="lights">Lights</option>
+          </select>
+        </Field>
+
         <Field label="Notes techniques">
           <textarea
             value={item.notes}
@@ -271,6 +280,17 @@ export function PropertiesPanel() {
           </div>
         )}
 
+        <div className="rounded-xl border border-emerald-300/15 bg-emerald-300/[0.04] p-3 space-y-3">
+          <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-emerald-200/70">Fiche technique</p>
+          <NumberField label="Poids" unit="kg" value={item.specs?.weightKg} onChange={(value) => updateItem(item.id, { specs: { ...item.specs, weightKg: value } })} />
+          <NumberField label="Consommation" unit="W" value={item.specs?.powerWatts} onChange={(value) => updateItem(item.id, { specs: { ...item.specs, powerWatts: value } })} />
+          <div className="grid grid-cols-3 gap-2">
+            <NumberField label="L" unit="mm" value={item.specs?.widthMm} onChange={(value) => updateItem(item.id, { specs: { ...item.specs, widthMm: value } })} />
+            <NumberField label="H" unit="mm" value={item.specs?.heightMm} onChange={(value) => updateItem(item.id, { specs: { ...item.specs, heightMm: value } })} />
+            <NumberField label="P" unit="mm" value={item.specs?.depthMm} onChange={(value) => updateItem(item.id, { specs: { ...item.specs, depthMm: value } })} />
+          </div>
+        </div>
+
         {/* Template management */}
         <div className="pt-2 border-t border-white/6 space-y-2">
           <button
@@ -354,4 +374,8 @@ function SliderField({
       </div>
     </div>
   );
+}
+
+function NumberField({ label, unit, value, onChange }: { label: string; unit: string; value?: number; onChange: (value?: number) => void }) {
+  return <label className="block"><span className="mb-1 block text-[9px] uppercase tracking-[0.12em] text-slate-500">{label}</span><div className="flex items-center gap-1"><input type="number" min="0" value={value ?? ""} onChange={(event) => onChange(event.target.value === "" ? undefined : Number(event.target.value))} className="field min-w-0 flex-1 py-1 text-xs" placeholder="—" /><span className="text-[10px] text-slate-500">{unit}</span></div></label>;
 }

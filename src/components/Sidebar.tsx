@@ -4,6 +4,7 @@ import { CATEGORIES } from "../lib/catalog";
 import { ItemGlyph } from "./ItemGlyph";
 import { VisualAsset } from "./VisualAsset";
 import { useStudio } from "../store/studioStore";
+import type { BoardLayer } from "../lib/types";
 
 export function Sidebar() {
   const addFromCatalog = useStudio((s) => s.addFromCatalog);
@@ -13,6 +14,8 @@ export function Sidebar() {
   const catalog = useStudio((s) => s.catalog);
   const setCatalogModalOpen = useStudio((s) => s.setCatalogModalOpen);
   const setEditingCatalogItemId = useStudio((s) => s.setEditingCatalogItemId);
+  const visibleLayers = useStudio((s) => s.visibleLayers);
+  const setLayerVisibility = useStudio((s) => s.setLayerVisibility);
 
   const [search, setSearch] = useState("");
   const [addedId, setAddedId] = useState<string | null>(null);
@@ -98,6 +101,17 @@ export function Sidebar() {
       </div>
 
       <div className="scrollbar-thin flex-1 space-y-5 overflow-y-auto px-3 py-4">
+        <div className="rounded-xl border border-white/8 bg-white/[0.03] p-3">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Calques</p>
+          <div className="grid grid-cols-2 gap-1.5">
+            {(["video", "audio", "accessories", "lights"] as BoardLayer[]).map((layer) => (
+              <label key={layer} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] text-slate-300 hover:bg-white/5">
+                <input type="checkbox" checked={visibleLayers?.[layer] ?? true} onChange={(event) => setLayerVisibility(layer, event.target.checked)} />
+                {layer === "video" ? "Vidéo" : layer === "audio" ? "Audio" : layer === "accessories" ? "Accessoires" : "Lights"}
+              </label>
+            ))}
+          </div>
+        </div>
         {CATEGORIES.map((category) => {
           const catItems = filtered.filter((item) => item.category === category.id);
           if (catItems.length === 0) return null;

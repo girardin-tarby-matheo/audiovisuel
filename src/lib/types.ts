@@ -2,6 +2,7 @@ export type Category = "camera" | "light" | "grip" | "audio" | "talent" | "set";
 export type ToolMode = "select" | "pan";
 export type ViewMode = "plan" | "synoptic";
 export type BoardStatus = "draft" | "prep" | "shooting" | "locked";
+export type BoardLayer = "video" | "audio" | "accessories" | "lights";
 
 export type CableType = "hdmi" | "sdi" | "xlr" | "jack" | "usb";
 
@@ -42,6 +43,9 @@ export type CatalogItem = {
   needsPower?: boolean;
   warningBadge?: string;
   deviceType?: SynopticDeviceType;
+  synopticTemplateId?: string;
+  layer?: BoardLayer;
+  specs?: EquipmentSpecs;
   defaults: {
     fov?: number;
     beamRadius?: number;
@@ -81,6 +85,16 @@ export type BoardObject = {
   needsPower?: boolean;
   warningBadge?: string;
   deviceType?: SynopticDeviceType;
+  layer: BoardLayer;
+  specs?: EquipmentSpecs;
+};
+
+export type EquipmentSpecs = {
+  weightKg?: number;
+  powerWatts?: number;
+  widthMm?: number;
+  heightMm?: number;
+  depthMm?: number;
 };
 
 export type CameraView = {

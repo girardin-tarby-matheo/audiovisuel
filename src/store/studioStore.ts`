@@ -2,24 +2,12 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { CATALOG, CATALOG_MAP } from "../lib/catalog";
 import { SYNOPTIC_TEMPLATES } from "../lib/synopticTemplates";
-import { GRID_SIZE } from "../lib/constants";
-import type { BoardLayer, BoardObject, BoardStatus, CableType, CameraView, CatalogItem, SynopticLink, SynopticNode, ToolMode, ViewMode } from "../lib/types";
+import type { BoardObject, BoardStatus, CableType, CameraView, CatalogItem, SynopticLink, SynopticNode, ToolMode, ViewMode } from "../lib/types";
 
 const uid = () =>
   typeof crypto !== "undefined" && crypto.randomUUID
     ? crypto.randomUUID()
     : `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-const DEFAULT_VISIBLE_LAYERS = { video: true, audio: true, accessories: true, lights: true } as const;
-
-function getBoardLayer(item: Pick<BoardObject, "category" | "layer"> | Pick<CatalogItem, "category" | "layer">): BoardLayer {
-  if (item.category === "light") return "lights";
-  if ((item.layer as string | undefined) === "power") return "lights";
-  if ((item.layer as string | undefined) === "data") return "accessories";
-  if (item.layer) return item.layer;
-  if (item.category === "audio") return "audio";
-  return item.category === "camera" ? "video" : "accessories";
-}
 
 function fromCatalogWithList(catalogList: CatalogItem[], catalogId: string, x: number, y: number): BoardObject | null {
   const src = catalogList.find((c) => c.id === catalogId) ?? CATALOG_MAP[catalogId];
@@ -51,12 +39,10 @@ function fromCatalogWithList(catalogList: CatalogItem[], catalogId: string, x: n
     needsPower: src.needsPower,
     warningBadge: src.warningBadge,
     deviceType: src.deviceType,
-    layer: getBoardLayer(src),
-    specs: src.specs ? structuredClone(src.specs) : undefined,
   };
 }
 
-const seedItems = (catalogList: CatalogItem[] = CATALOG): BoardObject[] => {
+const seedItems = (catalogList: CatalogItem[] = CATALOG): Record<string, BoardObject> => {
   const layout: Array<[string, number, number]> = [
     ["set-cyc", 520, 180],
     ["set-table", 540, 390],
@@ -75,31 +61,35 @@ const seedItems = (catalogList: CatalogItem[] = CATALOG): BoardObject[] => {
     ["set-boom", 360, 250],
     ["talent-director", 760, 620],
   ];
-  return layout
-    .map(([id, x, y]) => fromCatalogWithList(catalogList, id, x, y))
-    .filter((item): item is BoardObject => Boolean(item));
+  const items: Record<string, BoardObject> = {};
+  layout.forEach(([id, x, y]) => {
+    const item = fromCatalogWithList(catalogList, id, x, y);
+    if (item) items[item.id] = item;
+  });
+  return items;
 };
 
-function addMissingControlRoom(items: BoardObject[], catalogList: CatalogItem[] = CATALOG): BoardObject[] {
+function addMissingControlRoom(items: Record<string, BoardObject>, catalogList: CatalogItem[] = CATALOG): Record<string, BoardObject> {
   const additions: Array<[string, number, number]> = [
     ["set-atem-mini", 180, 300],
     ["set-monitor", 180, 205],
     ["set-sound-desk", 180, 430],
   ];
-  const existing = new Set(items.map((item) => item.catalogId));
-  return additions.reduce((result, [catalogId, x, y]) => {
-    if (existing.has(catalogId)) return result;
-    const item = fromCatalogWithList(catalogList, catalogId, x, y);
-    if (!item) return result;
-    existing.add(catalogId);
-    return [...result, item];
-  }, items);
+  const existing = new Set(Object.values(items).map((item) => item.catalogId));
+  const nextItems = { ...items };
+  additions.forEach(([catalogId, x, y]) => {
+    if (!existing.has(catalogId)) {
+      const item = fromCatalogWithList(catalogList, catalogId, x, y);
+      if (item) nextItems[item.id] = item;
+    }
+  });
+  return nextItems;
 }
 
 type StudioState = {
   title: string;
   status: BoardStatus;
-  items: BoardObject[];
+  items: Record<string, BoardObject>;
   catalog: CatalogItem[];
   selectedId: string | null;
   selectedIds: string[];
@@ -108,11 +98,8 @@ type StudioState = {
   spacePan: boolean;
   toast: string | null;
   viewMode: ViewMode;
-  synopticNodes: SynopticNode[];
+  synopticNodes: Record<string, SynopticNode>;
   synopticLinks: SynopticLink[];
-  visibleLayers: Record<BoardLayer, boolean>;
-  highlightedNodeIds: string[];
-  highlightedLinkIds: string[];
   isCatalogModalOpen: boolean;
   editingCatalogItemId: string | null;
   setTitle: (title: string) => void;
@@ -128,14 +115,10 @@ type StudioState = {
   updateItem: (id: string, patch: Partial<BoardObject>) => void;
   moveItem: (id: string, x: number, y: number) => void;
   moveItems: (moves: Array<{ id: string; x: number; y: number }>) => void;
-  duplicateItems: (ids: string[]) => void;
   removeItem: (id: string) => void;
   setToast: (message: string | null) => void;
   resetBoard: () => void;
   setViewMode: (viewMode: ViewMode) => void;
-  setLayerVisibility: (layer: BoardLayer, visible: boolean) => void;
-  traceSignal: (nodeId: string) => void;
-  clearSignalTrace: () => void;
   addCatalogItem: (item: Omit<CatalogItem, "id"> & { id?: string }) => string;
   updateCatalogItem: (id: string, patch: Partial<CatalogItem>, syncBoardItems?: boolean) => void;
   duplicateCatalogItem: (id: string) => string | null;
@@ -154,8 +137,6 @@ type StudioState = {
   updateSynopticLink: (id: string, patch: Partial<SynopticLink>) => void;
   exportProject: () => string;
   importProject: (json: string) => void;
-  importEquipmentList: (content: string) => void;
-  autoLayoutSynoptic: () => void;
 };
 
 export const useStudio = create<StudioState>()(
@@ -172,11 +153,8 @@ export const useStudio = create<StudioState>()(
       spacePan: false,
       toast: null,
       viewMode: "plan",
-      synopticNodes: [],
+      synopticNodes: {},
       synopticLinks: [],
-      visibleLayers: { ...DEFAULT_VISIBLE_LAYERS },
-      highlightedNodeIds: [],
-      highlightedLinkIds: [],
       isCatalogModalOpen: false,
       editingCatalogItemId: null,
       setTitle: (title) => set({ title }),
@@ -204,15 +182,25 @@ export const useStudio = create<StudioState>()(
       addFromCatalog: (catalogId, x, y) => {
         const item = fromCatalogWithList(get().catalog, catalogId, x, y);
         if (!item) return null;
-        set({ items: [...get().items, item], selectedId: item.id, selectedIds: [item.id] });
+        set({
+          items: { ...get().items, [item.id]: item },
+          selectedId: item.id,
+          selectedIds: [item.id]
+        });
         return item.id;
       },
       updateItem: (id, patch) => {
-        const nextItems = get().items.map((item) => (item.id === id ? { ...item, ...patch } : item));
+        const items = get().items;
+        if (!items[id]) return;
 
-        const nextSynopticNodes = get().synopticNodes.map((node) => {
+        const nextItems = { ...items, [id]: { ...items[id], ...patch } };
+
+        const synopticNodes = get().synopticNodes;
+        const nextSynopticNodes = { ...synopticNodes };
+
+        Object.entries(synopticNodes).forEach(([nodeId, node]) => {
           if (node.sourceId === id) {
-            return {
+            nextSynopticNodes[nodeId] = {
               ...node,
               ...(patch.name !== undefined ? { title: patch.name } : {}),
               ...(patch.label !== undefined ? { subtitle: patch.label } : {}),
@@ -222,7 +210,6 @@ export const useStudio = create<StudioState>()(
               ...(patch.notes !== undefined ? { notes: patch.notes } : {}),
             };
           }
-          return node;
         });
 
         set({
@@ -231,54 +218,33 @@ export const useStudio = create<StudioState>()(
         });
       },
       moveItem: (id, x, y) => {
-        const snapX = Math.round(x / GRID_SIZE) * GRID_SIZE;
-        const snapY = Math.round(y / GRID_SIZE) * GRID_SIZE;
-        return set({
-          items: get().items.map((item) => (item.id === id ? { ...item, x: snapX, y: snapY } : item)),
+        const items = get().items;
+        if (!items[id]) return;
+        set({
+          items: { ...items, [id]: { ...items[id], x, y } },
         });
       },
       moveItems: (moves) => {
-        const positions = new Map(moves.map((move) => [move.id, { x: Math.round(move.x / GRID_SIZE) * GRID_SIZE, y: Math.round(move.y / GRID_SIZE) * GRID_SIZE }]));
-        set({ items: get().items.map((item) => positions.get(item.id) ? { ...item, ...positions.get(item.id) } : item) });
-      },
-      duplicateItems: (ids) => {
-        const copies = get().items
-          .filter((item) => ids.includes(item.id))
-          .map((item) => ({ ...structuredClone(item), id: uid(), x: item.x + GRID_SIZE * 2, y: item.y + GRID_SIZE * 2 }));
-        if (!copies.length) return;
-        set({ items: [...get().items, ...copies], selectedId: copies[copies.length - 1].id, selectedIds: copies.map((item) => item.id), toast: `${copies.length} élément${copies.length > 1 ? "s" : ""} dupliqué${copies.length > 1 ? "s" : ""} ✓` });
+        const items = { ...get().items };
+        moves.forEach(({ id, x, y }) => {
+          if (items[id]) {
+            items[id] = { ...items[id], x, y };
+          }
+        });
+        set({ items });
       },
       removeItem: (id) =>
         set({
-          items: get().items.filter((item) => item.id !== id),
+          items: (function() {
+            const next = { ...get().items };
+            delete next[id];
+            return next;
+          })(),
           selectedId: get().selectedId === id ? null : get().selectedId,
           selectedIds: get().selectedIds.filter((selected) => selected !== id),
         }),
       setToast: (toast) => set({ toast }),
       setViewMode: (viewMode) => set({ viewMode }),
-      setLayerVisibility: (layer, visible) => set({ visibleLayers: { ...get().visibleLayers, [layer]: visible } }),
-      traceSignal: (nodeId) => {
-        const links = get().synopticLinks;
-        const adjacent = new Map<string, string[]>();
-        links.forEach((link) => {
-          adjacent.set(link.fromNodeId, [...(adjacent.get(link.fromNodeId) ?? []), link.toNodeId]);
-          adjacent.set(link.toNodeId, [...(adjacent.get(link.toNodeId) ?? []), link.fromNodeId]);
-        });
-        const visited = new Set<string>([nodeId]);
-        const queue = [nodeId];
-        while (queue.length) {
-          const current = queue.shift()!;
-          (adjacent.get(current) ?? []).forEach((next) => {
-            if (!visited.has(next)) {
-              visited.add(next);
-              queue.push(next);
-            }
-          });
-        }
-        const highlightedLinkIds = links.filter((link) => visited.has(link.fromNodeId) && visited.has(link.toNodeId)).map((link) => link.id);
-        set({ highlightedNodeIds: [...visited], highlightedLinkIds });
-      },
-      clearSignalTrace: () => set({ highlightedNodeIds: [], highlightedLinkIds: [] }),
 
       addCatalogItem: (itemData) => {
         const id = itemData.id || `custom-${Date.now()}`;
@@ -303,13 +269,13 @@ export const useStudio = create<StudioState>()(
         const currentCatalog = get().catalog;
         const updatedCatalog = currentCatalog.map((item) => (item.id === id ? { ...item, ...patch } : item));
 
-        let updatedItems = get().items;
-        let updatedSynoptic = get().synopticNodes;
+        let updatedItems = { ...get().items };
+        let updatedSynoptic = { ...get().synopticNodes };
 
         if (syncBoardItems) {
-          updatedItems = updatedItems.map((boardItem) => {
-            if (boardItem.catalogId !== id) return boardItem;
-            return {
+          Object.values(updatedItems).forEach(boardItem => {
+            if (boardItem.catalogId !== id) return;
+            updatedItems[boardItem.id] = {
               ...boardItem,
               ...(patch.name ? { name: patch.name } : {}),
               ...(patch.short ? { label: patch.short } : {}),
@@ -322,8 +288,6 @@ export const useStudio = create<StudioState>()(
               ...(patch.needsPower !== undefined ? { needsPower: patch.needsPower } : {}),
               ...(patch.warningBadge !== undefined ? { warningBadge: patch.warningBadge } : {}),
               ...(patch.deviceType !== undefined ? { deviceType: patch.deviceType } : {}),
-              ...(patch.layer !== undefined ? { layer: patch.layer } : {}),
-              ...(patch.specs !== undefined ? { specs: structuredClone(patch.specs) } : {}),
               ...(patch.defaults?.width !== undefined && boardItem.category === "set" ? { width: patch.defaults.width } : {}),
               ...(patch.defaults?.height !== undefined && boardItem.category === "set" ? { height: patch.defaults.height } : {}),
               ...(patch.defaults?.fov !== undefined && boardItem.category === "camera" ? { fov: patch.defaults.fov } : {}),
@@ -334,14 +298,14 @@ export const useStudio = create<StudioState>()(
           });
 
           const matchedBoardIds = new Set(
-            updatedItems.filter((b) => b.catalogId === id).map((b) => b.id)
+            Object.values(updatedItems).filter((b) => b.catalogId === id).map((b) => b.id)
           );
 
-          updatedSynoptic = updatedSynoptic.map((node) => {
+          Object.entries(updatedSynoptic).forEach(([nodeId, node]) => {
             const matchesBoardItem = node.sourceId && matchedBoardIds.has(node.sourceId);
             const matchesVisualKey = node.visualKey === id || node.id === id;
             if (matchesBoardItem || matchesVisualKey) {
-              return {
+              updatedSynoptic[nodeId] = {
                 ...node,
                 ...(patch.name ? { title: patch.name } : {}),
                 ...(patch.short ? { subtitle: patch.short } : {}),
@@ -354,7 +318,6 @@ export const useStudio = create<StudioState>()(
                 ...(patch.deviceType !== undefined ? { deviceType: patch.deviceType } : {}),
               };
             }
-            return node;
           });
         }
 
@@ -400,7 +363,7 @@ export const useStudio = create<StudioState>()(
       },
 
       saveItemToCatalog: (itemId) => {
-        const boardItem = get().items.find((i) => i.id === itemId);
+        const boardItem = get().items[itemId];
         if (!boardItem) return;
         const catItem = get().catalog.find((c) => c.id === boardItem.catalogId);
         if (!catItem) return;
@@ -429,7 +392,8 @@ export const useStudio = create<StudioState>()(
 
       generateSynoptic: () => {
         const state = get();
-        const relevantItems = state.items.filter((item) => {
+        const itemsArray = Object.values(state.items);
+        const relevantItems = itemsArray.filter((item) => {
           if (item.category === "talent") return false;
           if (item.catalogId.startsWith("set-table") || item.catalogId.startsWith("set-chair") || item.catalogId.startsWith("set-cyc") || item.catalogId.startsWith("grip-")) {
             return false;
@@ -437,13 +401,13 @@ export const useStudio = create<StudioState>()(
           return true;
         });
 
-        const nodes: SynopticNode[] = [];
+        const nodes: Record<string, SynopticNode> = {};
         const links: SynopticLink[] = [];
 
         // 1. Mélangeur ATEM Mini Expert
         const atemTemplate = SYNOPTIC_TEMPLATES["atem-mini-expert"];
         const atemId = uid();
-        nodes.push({
+        nodes[atemId] = {
           id: atemId,
           sourceId: null,
           title: atemTemplate.title,
@@ -457,12 +421,12 @@ export const useStudio = create<StudioState>()(
           portsIn: structuredClone(atemTemplate.portsIn),
           portsOut: structuredClone(atemTemplate.portsOut),
           needsPower: atemTemplate.needsPower,
-        });
+        };
 
         // 2. Console Son Yamaha
         const yamahaTemplate = SYNOPTIC_TEMPLATES["yamaha-mg12xu"];
         const yamahaId = uid();
-        nodes.push({
+        nodes[yamahaId] = {
           id: yamahaId,
           sourceId: null,
           title: yamahaTemplate.title,
@@ -477,7 +441,7 @@ export const useStudio = create<StudioState>()(
           portsOut: structuredClone(yamahaTemplate.portsOut),
           needsPower: yamahaTemplate.needsPower,
           warningBadge: yamahaTemplate.warningBadge,
-        });
+        };
 
         // Liaison Yamaha -> ATEM
         links.push({
@@ -495,7 +459,7 @@ export const useStudio = create<StudioState>()(
         const camTemplate = SYNOPTIC_TEMPLATES["generic-camera"];
         planCameras.forEach((cam, i) => {
           const nodeId = uid();
-          nodes.push({
+          nodes[nodeId] = {
             id: nodeId,
             sourceId: cam.id,
             title: cam.name || `Caméra ${i + 1}`,
@@ -509,7 +473,7 @@ export const useStudio = create<StudioState>()(
             portsIn: [],
             portsOut: structuredClone(camTemplate.portsOut),
             needsPower: true,
-          });
+          };
 
           if (i < atemTemplate.portsIn.filter(p => p.type === "hdmi").length) {
             const hdmiPort = atemTemplate.portsIn.filter(p => p.type === "hdmi")[i];
@@ -529,7 +493,7 @@ export const useStudio = create<StudioState>()(
         const micTemplate = SYNOPTIC_TEMPLATES["generic-mic"];
         planAudios.slice(0, 4).forEach((mic, i) => {
           const nodeId = uid();
-          nodes.push({
+          nodes[nodeId] = {
             id: nodeId,
             sourceId: mic.id,
             title: mic.name || `Micro ${i + 1}`,
@@ -543,7 +507,7 @@ export const useStudio = create<StudioState>()(
             portsIn: [],
             portsOut: structuredClone(micTemplate.portsOut),
             needsPower: false,
-          });
+          };
 
           const yamahaPort = yamahaTemplate.portsIn.filter(p => p.type === "xlr")[i];
           if (yamahaPort) {
@@ -576,7 +540,7 @@ export const useStudio = create<StudioState>()(
           const nodeId = uid();
           if (aval.templateId === "hyperdeck") hyperDeckNodeId = nodeId;
 
-          nodes.push({
+          nodes[nodeId] = {
             id: nodeId,
             sourceId: null,
             title: template.title,
@@ -588,13 +552,12 @@ export const useStudio = create<StudioState>()(
             portsIn: structuredClone(template.portsIn),
             portsOut: structuredClone(template.portsOut),
             needsPower: template.needsPower,
-          });
+          };
 
           if (aval.linkFrom) {
             const fromId = aval.linkFrom === "hyperdeck-ref" ? hyperDeckNodeId : aval.linkFrom;
             const fromTemplate = SYNOPTIC_TEMPLATES[aval.linkFrom === "hyperdeck-ref" ? "hyperdeck" : (aval.linkFrom === atemId ? "atem-mini-expert" : "yamaha-mg12xu")];
 
-            // Note: simplified port lookup for brevity in the logic
             links.push({
               id: uid(),
               fromNodeId: fromId,
@@ -629,28 +592,33 @@ export const useStudio = create<StudioState>()(
           needsPower: false,
           ...custom,
         };
-        set({ synopticNodes: [...get().synopticNodes, defaultNode] });
+        set({ synopticNodes: { ...get().synopticNodes, [id]: defaultNode } });
       },
 
       updateSynopticNode: (id, patch) => {
-        const nextSynopticNodes = get().synopticNodes.map((n) => (n.id === id ? { ...n, ...patch } : n));
-        const targetNode = nextSynopticNodes.find((n) => n.id === id);
+        const synopticNodes = get().synopticNodes;
+        if (!synopticNodes[id]) return;
 
-        let nextItems = get().items;
+        const nextSynopticNodes = {
+          ...synopticNodes,
+          [id]: { ...synopticNodes[id], ...patch }
+        };
+
+        const targetNode = nextSynopticNodes[id];
+
+        let nextItems = { ...get().items };
         if (targetNode && targetNode.sourceId) {
-          nextItems = nextItems.map((item) => {
-            if (item.id === targetNode.sourceId) {
-              return {
-                ...item,
-                ...(patch.title !== undefined ? { name: patch.title } : {}),
-                ...(patch.subtitle !== undefined ? { label: patch.subtitle } : {}),
-                ...(patch.color !== undefined ? { color: patch.color } : {}),
-                ...(patch.image !== undefined ? { image: patch.image } : {}),
-                ...(patch.notes !== undefined ? { notes: patch.notes } : {}),
-              };
-            }
-            return item;
-          });
+          const boardItem = nextItems[targetNode.sourceId];
+          if (boardItem) {
+            nextItems[boardItem.id] = {
+              ...boardItem,
+              ...(patch.title !== undefined ? { name: patch.title } : {}),
+              ...(patch.subtitle !== undefined ? { label: patch.subtitle } : {}),
+              ...(patch.color !== undefined ? { color: patch.color } : {}),
+              ...(patch.image !== undefined ? { image: patch.image } : {}),
+              ...(patch.notes !== undefined ? { notes: patch.notes } : {}),
+            };
+          }
         }
 
         set({
@@ -660,29 +628,38 @@ export const useStudio = create<StudioState>()(
       },
 
       moveSynopticNode: (id, x, y) => {
-        const snapX = Math.round(x / GRID_SIZE) * GRID_SIZE;
-        const snapY = Math.round(y / GRID_SIZE) * GRID_SIZE;
-        return set({
-          synopticNodes: get().synopticNodes.map((n) => (n.id === id ? { ...n, x: snapX, y: snapY } : n)),
+        const nodes = get().synopticNodes;
+        if (!nodes[id]) return;
+        set({
+          synopticNodes: { ...nodes, [id]: { ...nodes[id], x, y } },
         });
       },
       moveSynopticNodes: (moves) => {
-        const positions = new Map(moves.map((move) => [move.id, { x: Math.round(move.x / GRID_SIZE) * GRID_SIZE, y: Math.round(move.y / GRID_SIZE) * GRID_SIZE }]));
-        set({ synopticNodes: get().synopticNodes.map((node) => positions.get(node.id) ? { ...node, ...positions.get(node.id) } : node) });
+        const nodes = { ...get().synopticNodes };
+        moves.forEach(({ id, x, y }) => {
+          if (nodes[id]) {
+            nodes[id] = { ...nodes[id], x, y };
+          }
+        });
+        set({ synopticNodes: nodes });
       },
 
-      removeSynopticNode: (id) =>
+      removeSynopticNode: (id) => {
+        const nextNodes = { ...get().synopticNodes };
+        delete nextNodes[id];
         set({
-          synopticNodes: get().synopticNodes.filter((n) => n.id !== id),
+          synopticNodes: nextNodes,
           synopticLinks: get().synopticLinks.filter((l) => l.fromNodeId !== id && l.toNodeId !== id),
-        }),
+        });
+      },
 
-      toggleSynopticPower: (id) =>
+      toggleSynopticPower: (id) => {
+        const nodes = get().synopticNodes;
+        if (!nodes[id]) return;
         set({
-          synopticNodes: get().synopticNodes.map((n) =>
-            n.id === id ? { ...n, needsPower: !n.needsPower } : n
-          ),
-        }),
+          synopticNodes: { ...nodes, [id]: { ...nodes[id], needsPower: !nodes[id].needsPower } },
+        });
+      },
 
       addSynopticLink: (fromNodeId, toNodeId, fromPortId, toPortId, cableType = "hdmi") => {
         const newLink: SynopticLink = {
@@ -717,7 +694,6 @@ export const useStudio = create<StudioState>()(
           viewMode: state.viewMode,
           synopticNodes: state.synopticNodes,
           synopticLinks: state.synopticLinks,
-          visibleLayers: state.visibleLayers,
         };
         return JSON.stringify(data, null, 2);
       },
@@ -728,42 +704,17 @@ export const useStudio = create<StudioState>()(
           set({
             title: data.title || "Sans titre",
             status: data.status || "prep",
-            items: Array.isArray(data.items) ? data.items.map((item: BoardObject) => ({ ...item, layer: getBoardLayer(item) })) : [],
+            items: data.items || {},
             catalog: data.catalog || CATALOG,
             camera: data.camera || { x: 80, y: 40, zoom: 1 },
             viewMode: data.viewMode || "plan",
-            synopticNodes: data.synopticNodes || [],
+            synopticNodes: data.synopticNodes || {},
             synopticLinks: data.synopticLinks || [],
-            visibleLayers: { ...DEFAULT_VISIBLE_LAYERS, ...(data.visibleLayers || {}), accessories: data.visibleLayers?.accessories ?? data.visibleLayers?.data ?? true, lights: data.visibleLayers?.lights ?? data.visibleLayers?.power ?? true },
           });
           set({ toast: "Projet importé avec succès ✓" });
         } catch (e) {
           set({ toast: "Erreur lors de l'importation du projet" });
         }
-      },
-
-      importEquipmentList: (content) => {
-        try {
-          const parsed = content.trim().startsWith("[") ? JSON.parse(content) : content.trim().split(/\r?\n/).slice(1).map((line) => {
-            const [catalogId, x, y, label] = line.split(",").map((value) => value.trim());
-            return { catalogId, x: Number(x) || 400, y: Number(y) || 300, label };
-          });
-          const imported = parsed.map((entry: any, index: number) => {
-            const catalogId = entry.catalogId || entry.id || entry.catalog || get().catalog.find((item) => item.name === entry.name)?.id;
-            const item = catalogId ? fromCatalogWithList(get().catalog, catalogId, Number(entry.x) || 400 + index * 40, Number(entry.y) || 300 + index * 40) : null;
-            return item ? { ...item, ...(entry.name ? { name: entry.name } : {}), ...(entry.label ? { label: entry.label } : {}), ...(entry.layer ? { layer: entry.layer } : {}) } : null;
-          }).filter((item): item is BoardObject => Boolean(item));
-          if (!imported.length) throw new Error("Aucun équipement reconnu");
-          set({ items: [...get().items, ...imported], selectedIds: imported.map((item) => item.id), selectedId: imported[imported.length - 1].id, toast: `${imported.length} équipement${imported.length > 1 ? "s" : ""} importé${imported.length > 1 ? "s" : ""} ✓` });
-        } catch {
-          set({ toast: "Import équipements invalide" });
-        }
-      },
-
-      autoLayoutSynoptic: () => {
-        const nodes = get().synopticNodes;
-        const next = nodes.map((node, index) => ({ ...node, x: 120 + (index % 4) * 300, y: 120 + Math.floor(index / 4) * 220 }));
-        set({ synopticNodes: next, toast: "Synoptique réorganisé ✓" });
       },
 
       resetBoard: () =>
@@ -775,7 +726,7 @@ export const useStudio = create<StudioState>()(
           title: "Plateau — Interview studio",
           status: "prep",
           viewMode: "plan",
-          synopticNodes: [],
+          synopticNodes: {},
           synopticLinks: [],
         }),
     }),
@@ -801,23 +752,25 @@ export const useStudio = create<StudioState>()(
             catalog: state.catalog && Array.isArray(state.catalog) && state.catalog.length > 0 ? state.catalog : CATALOG,
           };
         }
-        if (version < 6 && Array.isArray(state.items)) {
+        if (version < 6) {
+          // Migration to Normalized State (Record<string, T>)
+          const items = state.items;
+          const synopticNodes = state.synopticNodes;
+
+          const normalizedItems: Record<string, BoardObject> = {};
+          if (Array.isArray(items)) {
+            items.forEach(i => { normalizedItems[i.id] = i; });
+          }
+
+          const normalizedNodes: Record<string, SynopticNode> = {};
+          if (Array.isArray(synopticNodes)) {
+            synopticNodes.forEach(n => { normalizedNodes[n.id] = n; });
+          }
+
           state = {
             ...state,
-            items: state.items.map((item: BoardObject) => ({ ...item, layer: getBoardLayer(item) })),
-            visibleLayers: { ...DEFAULT_VISIBLE_LAYERS, ...(state.visibleLayers || {}), accessories: state.visibleLayers?.accessories ?? state.visibleLayers?.data ?? true, lights: state.visibleLayers?.lights ?? state.visibleLayers?.power ?? true },
-          };
-        }
-        if (state) {
-          state = {
-            ...state,
-            visibleLayers: { ...DEFAULT_VISIBLE_LAYERS, ...(state.visibleLayers || {}), accessories: state.visibleLayers?.accessories ?? state.visibleLayers?.data ?? true, lights: state.visibleLayers?.lights ?? state.visibleLayers?.power ?? true },
-            items: Array.isArray(state.items)
-              ? state.items.map((item: BoardObject) => ({
-                ...item,
-                layer: getBoardLayer(item),
-              }))
-              : state.items,
+            items: normalizedItems,
+            synopticNodes: normalizedNodes,
           };
         }
         return state;
@@ -831,7 +784,6 @@ export const useStudio = create<StudioState>()(
         viewMode: state.viewMode,
         synopticNodes: state.synopticNodes,
         synopticLinks: state.synopticLinks,
-        visibleLayers: state.visibleLayers,
       }),
     },
   ),

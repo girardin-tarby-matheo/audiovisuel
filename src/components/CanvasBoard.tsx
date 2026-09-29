@@ -5,8 +5,18 @@ import { BottomToolbar } from "./Sidebar";
 import { screenToWorld, useStudio } from "../store/studioStore";
 import type { CameraView } from "../lib/types";
 
+type MarqueeState = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  currentX: number;
+  currentY: number;
+  additive: boolean;
+};
+
 function Minimap() {
-  const items = useStudio((s) => s.items);
+  const itemsMap = useStudio((s) => s.items);
+  const items = useMemo(() => Object.values(itemsMap), [itemsMap]);
   const camera = useStudio((s) => s.camera);
   const selectedId = useStudio((s) => s.selectedId);
 
@@ -68,23 +78,33 @@ function Minimap() {
 
 export function CanvasBoard() {
   const boardRef = useRef<HTMLDivElement>(null);
-  const items = useStudio((s) => s.items);
+  const itemsMap = useStudio((s) => s.items);
+  const items = useMemo(() => Object.values(itemsMap), [itemsMap]);
   const selectedId = useStudio((s) => s.selectedId);
+  const selectedIds = useStudio((s) => s.selectedIds);
+  const visibleLayers = useStudio((s) => s.visibleLayers);
   const camera = useStudio((s) => s.camera);
   const tool = useStudio((s) => s.tool);
   const spacePan = useStudio((s) => s.spacePan);
   const setCamera = useStudio((s) => s.setCamera);
   const setSpacePan = useStudio((s) => s.setSpacePan);
   const select = useStudio((s) => s.select);
+  const selectMany = useStudio((s) => s.selectMany);
   const addFromCatalog = useStudio((s) => s.addFromCatalog);
-  const moveItem = useStudio((s) => s.moveItem);
-  const updateItem = useStudio((s) => s.updateItem);
-  const removeItem = useStudio((s) => s.removeItem);
+  const moveItem = useCallback(useStudio((s) => s.moveItem), []);
+  const moveItems = useCallback(useStudio((s) => s.moveItems), []);
+  const updateItem = useCallback(useStudio((s) => s.updateItem), []);
+  const removeItem = useCallback(useStudio((s) => s.removeItem), []);
+  const duplicateItems = useCallback(useStudio((s) => s.duplicateItems), []);
   const setTool = useStudio((s) => s.setTool);
 
   const [isDragOver, setIsDragOver] = useState(false);
+  const [marquee, setMarquee] = useState<{ startX: number; startY: number; x: number; y: number } | null>(null);
+  const marqueeRef = useRef<MarqueeState | null>(null);
   const panRef = useRef<{ pointerId: number; startX: number; startY: number; origin: CameraView } | null>(null);
   const panActive = tool === "pan" || spacePan;
+  const clipboardRef = useRef<string[]>([]);
+  const selectedItems = useMemo(() => items.filter((candidate) => selectedIds.includes(candidate.id)), [items, selectedIds]);
 
   // Auto-center canvas on initial load
   useEffect(() => {
@@ -118,9 +138,17 @@ export function CanvasBoard() {
         event.preventDefault();
         setSpacePan(true);
       }
-      if ((event.key === "Delete" || event.key === "Backspace") && selectedId && !typing) {
+      if ((event.key === "Delete" || event.key === "Backspace") && selectedIds.length > 0 && !typing) {
         event.preventDefault();
-        removeItem(selectedId);
+        selectedIds.forEach(removeItem);
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c" && !typing) {
+        event.preventDefault();
+        clipboardRef.current = [...selectedIds];
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "v" && !typing) {
+        event.preventDefault();
+        duplicateItems(clipboardRef.current.length ? clipboardRef.current : selectedIds);
       }
       if (typing) return;
       if (event.key.toLowerCase() === "v") setTool("select");
@@ -135,7 +163,7 @@ export function CanvasBoard() {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, [removeItem, selectedId, setSpacePan, setTool]);
+  }, [removeItem, selectedIds, setSpacePan, setTool]);
 
   // Wheel zoom (native event for passive: false)
   useEffect(() => {
@@ -168,7 +196,20 @@ export function CanvasBoard() {
       const isPan = panActive || event.button === 1;
       if (!isPan) {
         if (event.target === event.currentTarget || (event.target as HTMLElement).dataset.world) {
-          select(null);
+          const rect = boardRef.current.getBoundingClientRect();
+          const x = event.clientX - rect.left;
+          const y = event.clientY - rect.top;
+          marqueeRef.current = {
+            pointerId: event.pointerId,
+            startX: x,
+            startY: y,
+            currentX: x,
+            currentY: y,
+            additive: event.shiftKey || event.ctrlKey || event.metaKey,
+          };
+          setMarquee({ startX: x, startY: y, x, y });
+          event.currentTarget.setPointerCapture(event.pointerId);
+          if (!marqueeRef.current.additive) select(null);
         }
         return;
       }
@@ -176,10 +217,42 @@ export function CanvasBoard() {
       event.currentTarget.setPointerCapture(event.pointerId);
       panRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, origin: { ...useStudio.getState().camera } };
     },
-    [panActive, select, setCamera],
+    [panActive, select],
   );
 
+  const finishMarquee = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const activeMarquee = marqueeRef.current;
+    if (!activeMarquee || activeMarquee.pointerId !== event.pointerId || !boardRef.current) return;
+    const rect = boardRef.current.getBoundingClientRect();
+    const endX = event.clientX - rect.left;
+    const endY = event.clientY - rect.top;
+    const left = Math.min(activeMarquee.startX, endX);
+    const right = Math.max(activeMarquee.startX, endX);
+    const top = Math.min(activeMarquee.startY, endY);
+    const bottom = Math.max(activeMarquee.startY, endY);
+    const currentCamera = useStudio.getState().camera;
+    const selected = items.filter((item) => {
+      const x = currentCamera.x + item.x * currentCamera.zoom;
+      const y = currentCamera.y + item.y * currentCamera.zoom;
+      return x >= left && x <= right && y >= top && y <= bottom;
+    }).map((item) => item.id);
+    selectMany(selected, activeMarquee.additive);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    marqueeRef.current = null;
+    setMarquee(null);
+  }, [items, selectMany]);
+
   const onPointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const activeMarquee = marqueeRef.current;
+    if (activeMarquee && activeMarquee.pointerId === event.pointerId) {
+      const rect = boardRef.current?.getBoundingClientRect();
+      if (rect) {
+        activeMarquee.currentX = event.clientX - rect.left;
+        activeMarquee.currentY = event.clientY - rect.top;
+        setMarquee({ startX: activeMarquee.startX, startY: activeMarquee.startY, x: activeMarquee.currentX, y: activeMarquee.currentY });
+      }
+      return;
+    }
     const pan = panRef.current;
     if (!pan || pan.pointerId !== event.pointerId) return;
     event.preventDefault();
@@ -187,11 +260,15 @@ export function CanvasBoard() {
   }, [setCamera]);
 
   const finishPan = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (marqueeRef.current) {
+      finishMarquee(event);
+      return;
+    }
     const pan = panRef.current;
     if (!pan || pan.pointerId !== event.pointerId) return;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     panRef.current = null;
-  }, []);
+  }, [finishMarquee]);
 
   // Drop handling
   const onDrop = useCallback(
@@ -243,20 +320,37 @@ export function CanvasBoard() {
             height: 4000,
           }}
         >
-          {items.map((item) => (
+          {items.filter((item) => {
+            const layer = item.category === "light" || (item.layer as string) === "power" ? "lights" : (item.layer as string) === "data" ? "accessories" : item.layer ?? (item.category === "audio" ? "audio" : item.category === "camera" ? "video" : "accessories");
+            return visibleLayers?.[layer] ?? true;
+          }).map((item) => (
             <BoardNode
               key={item.id}
               item={item}
-              selected={item.id === selectedId}
+              selected={selectedIds.includes(item.id)}
+              selectedItems={selectedItems}
               panActive={panActive}
               zoom={camera.zoom}
               onSelect={select}
               onMove={moveItem}
+              onMoveMany={moveItems}
               onUpdate={updateItem}
               onRemove={removeItem}
             />
           ))}
         </div>
+
+        {marquee && (
+          <div
+            className="pointer-events-none absolute z-50 border border-amber-400 bg-amber-300/10"
+            style={{
+              left: Math.min(marquee.startX, marquee.x),
+              top: Math.min(marquee.startY, marquee.y),
+              width: Math.abs(marquee.x - marquee.startX),
+              height: Math.abs(marquee.y - marquee.startY),
+            }}
+          />
+        )}
 
         {/* Drop zone hint */}
         {isDragOver && (

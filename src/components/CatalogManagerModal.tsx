@@ -19,9 +19,9 @@ import {
 } from "lucide-react";
 import { useStudio } from "../store/studioStore";
 import { CATEGORIES } from "../lib/catalog";
+import { CABLE_COLORS } from "../lib/constants";
 import { ItemGlyph } from "./ItemGlyph";
 import { VisualAsset } from "./VisualAsset";
-import { CABLE_COLORS } from "./SynopticBoard";
 import type { Category, CatalogItem, CableType, SynopticPort, SynopticDeviceType } from "../lib/types";
 
 const COLOR_PRESETS = [
@@ -288,8 +288,8 @@ export function CatalogManagerModal() {
                   type="button"
                   onClick={() => setSelectedCategory("all")}
                   className={`rounded-lg px-2 py-1 text-[10px] font-semibold transition ${selectedCategory === "all"
-                      ? "bg-amber-400/20 text-amber-200 border border-amber-400/40"
-                      : "bg-white/[0.03] text-slate-400 hover:text-white"
+                    ? "bg-amber-400/20 text-amber-200 border border-amber-400/40"
+                    : "bg-white/[0.03] text-slate-400 hover:text-white"
                     }`}
                 >
                   Tous ({catalog.length})
@@ -302,8 +302,8 @@ export function CatalogManagerModal() {
                       type="button"
                       onClick={() => setSelectedCategory(cat.id)}
                       className={`rounded-lg px-2 py-1 text-[10px] font-semibold transition ${selectedCategory === cat.id
-                          ? "bg-amber-400/20 text-amber-200 border border-amber-400/40"
-                          : "bg-white/[0.03] text-slate-400 hover:text-white"
+                        ? "bg-amber-400/20 text-amber-200 border border-amber-400/40"
+                        : "bg-white/[0.03] text-slate-400 hover:text-white"
                         }`}
                     >
                       {cat.label.split(" ")[0]} ({count})
@@ -335,8 +335,8 @@ export function CatalogManagerModal() {
                       });
                     }}
                     className={`flex w-full items-center gap-2.5 rounded-xl p-2 text-left transition-all ${isSelected
-                        ? "bg-amber-400/15 border border-amber-400/40 shadow-sm"
-                        : "border border-transparent hover:bg-white/[0.04]"
+                      ? "bg-amber-400/15 border border-amber-400/40 shadow-sm"
+                      : "border border-transparent hover:bg-white/[0.04]"
                       }`}
                   >
                     <div
@@ -540,8 +540,8 @@ export function CatalogManagerModal() {
                           type="button"
                           onClick={() => setFormState({ ...formState, color: col })}
                           className={`h-6 w-6 rounded-full transition-transform ${formState.color === col
-                              ? "scale-125 ring-2 ring-white ring-offset-2 ring-offset-[#0e1118]"
-                              : "hover:scale-110"
+                            ? "scale-125 ring-2 ring-white ring-offset-2 ring-offset-[#0e1118]"
+                            : "hover:scale-110"
                             }`}
                           style={{ backgroundColor: col }}
                         />

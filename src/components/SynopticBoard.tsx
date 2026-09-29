@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, type ChangeEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useState, useRef, useCallback, useEffect, memo, useMemo, type ChangeEvent, type PointerEvent as ReactPointerEvent } from "react";
 import {
   RefreshCw,
   Plus,
@@ -21,15 +21,13 @@ import {
 } from "lucide-react";
 import { useStudio } from "../store/studioStore";
 import { VisualAsset } from "./VisualAsset";
+import { ValidationPanel } from "./ValidationPanel";
+import { CABLE_COLORS } from "../lib/constants";
+import { validateSynoptic } from "../lib/validation";
 import type { CableType, SynopticDeviceType, SynopticNode, SynopticPort } from "../lib/types";
 
-export const CABLE_COLORS: Record<CableType, { color: string; label: string; bg: string }> = {
-  hdmi: { color: "#f97316", label: "HDMI", bg: "bg-orange-500" },
-  sdi: { color: "#ef4444", label: "SDI", bg: "bg-red-500" },
-  xlr: { color: "#3b82f6", label: "XLR", bg: "bg-blue-500" },
-  jack: { color: "#ec4899", label: "Jack", bg: "bg-pink-500" },
-  usb: { color: "#06b6d4", label: "USB", bg: "bg-cyan-500" },
-};
+
+// Removed local CABLE_COLORS constant as it is now imported from ../lib/constants
 
 type DragState = {
   id: string;
@@ -38,6 +36,16 @@ type DragState = {
   startY: number;
   originX: number;
   originY: number;
+  groupOrigins: Array<{ id: string; x: number; y: number }>;
+};
+
+type MarqueeState = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  currentX: number;
+  currentY: number;
+  additive: boolean;
 };
 
 type LinkingState = {
@@ -51,36 +59,88 @@ type LinkingState = {
 };
 
 export function SynopticBoard() {
-  const nodes = useStudio((state) => state.synopticNodes);
+  const nodesMap = useStudio((state) => state.synopticNodes);
+  const nodes = useMemo(() => Object.values(nodesMap), [nodesMap]);
   const links = useStudio((state) => state.synopticLinks);
-  const generateSynoptic = useStudio((state) => state.generateSynoptic);
-  const addSynopticNode = useStudio((state) => state.addSynopticNode);
-  const updateSynopticNode = useStudio((state) => state.updateSynopticNode);
-  const moveSynopticNode = useStudio((state) => state.moveSynopticNode);
-  const removeSynopticNode = useStudio((state) => state.removeSynopticNode);
-  const toggleSynopticPower = useStudio((state) => state.toggleSynopticPower);
-  const addSynopticLink = useStudio((state) => state.addSynopticLink);
-  const removeSynopticLink = useStudio((state) => state.removeSynopticLink);
-  const setToast = useStudio((state) => state.setToast);
+  const generateSynoptic = useCallback(useStudio((state) => state.generateSynoptic), []);
+  const addSynopticNode = useCallback(useStudio((state) => state.addSynopticNode), []);
+  const updateSynopticNode = useCallback(useStudio((state) => state.updateSynopticNode), []);
+  const moveSynopticNode = useCallback(useStudio((state) => state.moveSynopticNode), []);
+  const moveSynopticNodes = useCallback(useStudio((state) => state.moveSynopticNodes), []);
+  const removeSynopticNode = useCallback(useStudio((state) => state.removeSynopticNode), []);
+  const toggleSynopticPower = useCallback(useStudio((state) => state.toggleSynopticPower), []);
+  const addSynopticLink = useCallback(useStudio((state) => state.addSynopticLink), []);
+  const removeSynopticLink = useCallback(useStudio((state) => state.removeSynopticLink), []);
+  const setToast = useCallback(useStudio((state) => state.setToast), []);
+  const highlightedNodeIds = useStudio((state) => state.highlightedNodeIds);
+  const highlightedLinkIds = useStudio((state) => state.highlightedLinkIds);
+  const traceSignal = useCallback(useStudio((state) => state.traceSignal), []);
+  const clearSignalTrace = useCallback(useStudio((state) => state.clearSignalTrace), []);
+  const autoLayoutSynoptic = useCallback(useStudio((state) => state.autoLayoutSynoptic), []);
+  const spacePan = useStudio((state) => state.spacePan);
+  const setSpacePan = useCallback(useStudio((state) => state.setSpacePan), []);
 
   const [zoom, setZoom] = useState(0.85);
   const [pan, setPan] = useState({ x: 40, y: 30 });
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
 
+  // Validation logic
+  const validationErrors = useMemo(() => {
+    try {
+      return validateSynoptic(nodes, links);
+    } catch (e) {
+      console.error("Validation error:", e);
+      return [];
+    }
+  }, [nodes, links]);
+  const getNodeError = useCallback((nodeId: string) => {
+    return validationErrors.find((e) => e.nodeId === nodeId);
+  }, [validationErrors]);
+
   const [linking, setLinking] = useState<LinkingState | null>(null);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null);
+  const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
+  const [marquee, setMarquee] = useState<{ startX: number; startY: number; x: number; y: number } | null>(null);
+  const [showValidation, setShowValidation] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
+  const marqueeRef = useRef<MarqueeState | null>(null);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const typing = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement;
+      if (event.code === "Space" && !event.repeat && !typing) {
+        event.preventDefault();
+        setSpacePan(true);
+      }
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.code === "Space") setSpacePan(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
+  }, [setSpacePan]);
 
   // Déplacement d'un bloc équipement
   const onNodePointerDown = (node: SynopticNode, event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || (event.target as HTMLElement).closest("input,button,.port-handle")) return;
     event.preventDefault();
     event.stopPropagation();
+    const additive = event.shiftKey || event.ctrlKey || event.metaKey;
+    setSelectedNodeIds((current) => additive
+      ? current.includes(node.id) ? current.filter((id) => id !== node.id) : [...current, node.id]
+      : [node.id]);
     event.currentTarget.setPointerCapture(event.pointerId);
+    const groupOrigins = selectedNodeIds.includes(node.id)
+      ? nodes.filter((candidate) => selectedNodeIds.includes(candidate.id)).map(({ id, x, y }) => ({ id, x, y }))
+      : [{ id: node.id, x: node.x, y: node.y }];
     dragRef.current = {
       id: node.id,
       pointerId: event.pointerId,
@@ -88,6 +148,7 @@ export function SynopticBoard() {
       startY: event.clientY,
       originX: node.x,
       originY: node.y,
+      groupOrigins,
     };
   };
 
@@ -96,7 +157,11 @@ export function SynopticBoard() {
     if (!drag || drag.pointerId !== event.pointerId) return;
     const dx = (event.clientX - drag.startX) / zoom;
     const dy = (event.clientY - drag.startY) / zoom;
-    moveSynopticNode(drag.id, Math.round(drag.originX + dx), Math.round(drag.originY + dy));
+    if (drag.groupOrigins.length > 1) {
+      moveSynopticNodes(drag.groupOrigins.map((origin) => ({ id: origin.id, x: Math.round(origin.x + dx), y: Math.round(origin.y + dy) })));
+    } else {
+      moveSynopticNode(drag.id, Math.round(drag.originX + dx), Math.round(drag.originY + dy));
+    }
   };
 
   const finishNodeDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -109,15 +174,36 @@ export function SynopticBoard() {
 
   // Panning du canevas
   const onCanvasPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if ((e.target as HTMLElement).closest(".synoptic-card, .synoptic-ui")) return;
-    if (e.button === 0 || e.button === 1) {
+    if ((e.target as HTMLElement).closest(".synoptic-card, .synoptic-ui") || e.button === 2) return;
+    if (e.button === 1 || (spacePan && e.button === 0)) {
       setIsPanning(true);
       panStartRef.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      return;
     }
+    if (e.button !== 0) return;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const startX = e.clientX - rect.left;
+    const startY = e.clientY - rect.top;
+    const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+    marqueeRef.current = { pointerId: e.pointerId, startX, startY, currentX: startX, currentY: startY, additive };
+    setMarquee({ startX, startY, x: startX, y: startY });
+    if (!additive) setSelectedNodeIds([]);
+    e.currentTarget.setPointerCapture(e.pointerId);
   };
 
   const onCanvasPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const activeMarquee = marqueeRef.current;
+    if (activeMarquee && activeMarquee.pointerId === e.pointerId) {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        activeMarquee.currentX = e.clientX - rect.left;
+        activeMarquee.currentY = e.clientY - rect.top;
+        setMarquee({ startX: activeMarquee.startX, startY: activeMarquee.startY, x: activeMarquee.currentX, y: activeMarquee.currentY });
+      }
+      return;
+    }
     if (isPanning) {
       setPan({
         x: panStartRef.current.panX + (e.clientX - panStartRef.current.x),
@@ -143,6 +229,33 @@ export function SynopticBoard() {
   };
 
   const onCanvasPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const activeMarquee = marqueeRef.current;
+    if (activeMarquee && activeMarquee.pointerId === e.pointerId) {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        const endX = e.clientX - rect.left;
+        const endY = e.clientY - rect.top;
+        const left = Math.min(activeMarquee.startX, endX);
+        const right = Math.max(activeMarquee.startX, endX);
+        const top = Math.min(activeMarquee.startY, endY);
+        const bottom = Math.max(activeMarquee.startY, endY);
+        const hits = nodes.filter((node) => {
+          const width = node.width || (node.deviceType === "mixer" ? 280 : node.deviceType === "audio" ? 250 : 200);
+          const height = node.height || 100;
+          const nodeLeft = pan.x + node.x * zoom;
+          const nodeTop = pan.y + node.y * zoom;
+          return nodeLeft < right && nodeLeft + width * zoom > left && nodeTop < bottom && nodeTop + height * zoom > top;
+        }).map((node) => node.id);
+        const isClick = right - left < 4 && bottom - top < 4;
+        if (!isClick || !activeMarquee.additive) {
+          setSelectedNodeIds((current) => activeMarquee.additive ? [...new Set([...current, ...hits])] : hits);
+        }
+      }
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+      marqueeRef.current = null;
+      setMarquee(null);
+      return;
+    }
     if (isPanning) {
       setIsPanning(false);
       try {
@@ -159,8 +272,23 @@ export function SynopticBoard() {
   const onWheel = (e: React.WheelEvent) => {
     if (e.ctrlKey || e.metaKey || !e.shiftKey) {
       e.preventDefault();
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const worldX = (mouseX - pan.x) / zoom;
+      const worldY = (mouseY - pan.y) / zoom;
+
       const zoomFactor = e.deltaY > 0 ? 0.92 : 1.08;
-      setZoom((z) => Math.min(1.8, Math.max(0.4, z * zoomFactor)));
+      const nextZoom = Math.min(1.8, Math.max(0.4, zoom * zoomFactor));
+
+      setZoom(nextZoom);
+      setPan({
+        x: mouseX - worldX * nextZoom,
+        y: mouseY - worldY * nextZoom,
+      });
     }
   };
 
@@ -201,7 +329,7 @@ export function SynopticBoard() {
     setLinking(null);
   };
 
-  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+  const nodeMap = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
 
   // Calcul des coordonnées d'un port
   const getPortCoordinates = useCallback(
@@ -210,7 +338,6 @@ export function SynopticBoard() {
       if (!node) return null;
 
       const width = node.width || (node.deviceType === "mixer" ? 280 : node.deviceType === "audio" ? 250 : 200);
-      const isMixer = node.deviceType === "mixer" || node.deviceType === "audio";
 
       if (!portId) {
         return {
@@ -241,35 +368,49 @@ export function SynopticBoard() {
         y: node.y + portOffset,
       };
     },
-    [nodeMap]
+    [nodeMap, pan, zoom]
   );
 
-  const addPresetDevice = (type: SynopticDeviceType, title: string, subtitle: string, inCount = 1, outCount = 1, needsPower = false) => {
-    const portsIn: SynopticPort[] = Array.from({ length: inCount }, (_, i) => ({
-      id: crypto.randomUUID(),
-      name: `IN ${i + 1}`,
-      type: "hdmi",
-    }));
-    const portsOut: SynopticPort[] = Array.from({ length: outCount }, (_, i) => ({
-      id: crypto.randomUUID(),
-      name: `OUT ${i + 1}`,
-      type: "hdmi",
-    }));
-
+  const addPresetDevice = (deviceType: SynopticDeviceType, title: string, subtitle: string, inputCount: number, outputCount: number, needsPower: boolean) => {
+    const stamp = Date.now();
     addSynopticNode({
+      deviceType,
       title,
       subtitle,
-      deviceType: type,
-      color: type === "camera" ? "#06b6d4" : type === "audio" || type === "mic" ? "#3b82f6" : "#f59e0b",
-      portsIn,
-      portsOut,
       needsPower,
-      x: 350 - pan.x / zoom,
-      y: 250 - pan.y / zoom,
+      portsIn: Array.from({ length: inputCount }, (_, index) => ({ id: `${stamp}-in-${index}`, name: `IN ${index + 1}`, type: (deviceType === "mic" ? "xlr" : "hdmi") as CableType })),
+      portsOut: Array.from({ length: outputCount }, (_, index) => ({ id: `${stamp}-out-${index}`, name: `OUT ${index + 1}`, type: (deviceType === "mic" ? "xlr" : "hdmi") as CableType })),
     });
     setShowAddMenu(false);
-    setToast(`${title} ajouté`);
   };
+
+  // Dépôt d'un élément depuis la sidebar
+  const onDrop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      const catalogId = event.dataTransfer.getData("application/shotboard");
+      if (!catalogId) return;
+
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const worldX = (event.clientX - rect.left - pan.x) / zoom;
+      const worldY = (event.clientY - rect.top - pan.y) / zoom;
+
+      // On utilise un template générique ou on cherche un template spécifique si possible
+      // Pour l'instant, on ajoute un nœud générique basé sur le catalogId
+      addSynopticNode({
+        title: "Nouvel appareil",
+        subtitle: "Équipement ajouté",
+        x: worldX,
+        y: worldY,
+        // On pourrait ici mapper catalogId -> templateId
+      });
+      setToast("Appareil ajouté au synoptique ✓");
+    },
+    [pan, zoom, addSynopticNode, setToast]
+  );
+
 
   return (
     <section className="relative min-w-0 flex-1 overflow-hidden select-none bg-[#f8fafc] text-slate-800">
@@ -351,7 +492,13 @@ export function SynopticBoard() {
             </div>
           )}
         </div>
+        <button type="button" onClick={() => setShowValidation((open) => !open)} className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50" title="Afficher les erreurs techniques">
+          <AlertTriangle size={13} className="text-amber-600" /> Validation
+        </button>
+        <button type="button" onClick={autoLayoutSynoptic} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50" title="Aligner automatiquement les équipements">Auto-layout</button>
+        {highlightedNodeIds.length > 0 && <button type="button" onClick={clearSignalTrace} className="rounded-xl border border-cyan-300 bg-cyan-50 px-3 py-2 text-xs font-semibold text-cyan-700 shadow-sm">Effacer le flux</button>}
       </div>
+      {showValidation && <ValidationPanel onClose={() => setShowValidation(false)} />}
 
       {/* Légende en haut à droite (fidele à l'image fournie) */}
       <div className="synoptic-ui absolute right-4 top-3 z-30 rounded-2xl border border-slate-300 bg-white/95 p-3 shadow-lg backdrop-blur">
@@ -427,8 +574,12 @@ export function SynopticBoard() {
         onPointerDown={onCanvasPointerDown}
         onPointerMove={onCanvasPointerMove}
         onPointerUp={onCanvasPointerUp}
+        onPointerCancel={onCanvasPointerUp}
+        onLostPointerCapture={onCanvasPointerUp}
         onWheel={onWheel}
-        className="absolute inset-0 cursor-grab active:cursor-grabbing overflow-hidden"
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={onDrop}
+        className={`absolute inset-0 overflow-hidden ${spacePan || isPanning ? "cursor-grab active:cursor-grabbing" : marquee ? "cursor-crosshair" : "cursor-default"}`}
         style={{
           backgroundColor: "#ffffff",
           backgroundImage:
@@ -468,7 +619,7 @@ export function SynopticBoard() {
                 } ${end.y}, ${end.x} ${end.y}`;
 
               return (
-                <g key={link.id} className="pointer-events-auto cursor-pointer" onClick={() => setSelectedLinkId(link.id)}>
+                <g key={link.id} className="pointer-events-auto cursor-pointer" onClick={() => setSelectedLinkId(link.id)} opacity={highlightedLinkIds.length === 0 || highlightedLinkIds.includes(link.id) ? 1 : 0.18}>
                   {/* Contour de sélection */}
                   {isSelected && (
                     <path
@@ -547,6 +698,7 @@ export function SynopticBoard() {
             <DeviceNodeCard
               key={node.id}
               node={node}
+              selected={selectedNodeIds.includes(node.id)}
               onPointerDown={onNodePointerDown}
               onPointerMove={onNodePointerMove}
               onPointerUp={finishNodeDrag}
@@ -555,16 +707,31 @@ export function SynopticBoard() {
               onTogglePower={toggleSynopticPower}
               onStartLinking={startLinking}
               onCompleteLinking={completeLinking}
+              onTrace={() => traceSignal(node.id)}
+              error={getNodeError(node.id)}
             />
           ))}
+
         </div>
+        {marquee && (
+          <div
+            className="pointer-events-none absolute z-50 border-2 border-violet-500 bg-violet-300/20"
+            style={{
+              left: Math.min(marquee.startX, marquee.x),
+              top: Math.min(marquee.startY, marquee.y),
+              width: Math.abs(marquee.x - marquee.startX),
+              height: Math.abs(marquee.y - marquee.startY),
+            }}
+          />
+        )}
       </div>
     </section>
   );
 }
 
-function DeviceNodeCard({
+export const DeviceNodeCard = memo(function DeviceNodeCard({
   node,
+  selected,
   onPointerDown,
   onPointerMove,
   onPointerUp,
@@ -573,8 +740,11 @@ function DeviceNodeCard({
   onTogglePower,
   onStartLinking,
   onCompleteLinking,
+  onTrace,
+  error,
 }: {
   node: SynopticNode;
+  selected: boolean;
   onPointerDown: (node: SynopticNode, event: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerUp: (event: ReactPointerEvent<HTMLDivElement>) => void;
@@ -583,6 +753,8 @@ function DeviceNodeCard({
   onTogglePower: (id: string) => void;
   onStartLinking: (node: SynopticNode, port: SynopticPort, e: ReactPointerEvent) => void;
   onCompleteLinking: (node: SynopticNode, port: SynopticPort, e: ReactPointerEvent) => void;
+  onTrace: () => void;
+  error?: { message: string; severity: "error" | "warning" };
 }) {
   const isMixer = node.deviceType === "mixer";
   const isAudioMixer = node.deviceType === "audio";
@@ -601,7 +773,7 @@ function DeviceNodeCard({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
-      className="synoptic-card group absolute flex flex-col rounded-lg border-2 border-slate-700 bg-white text-slate-800 shadow-md transition-shadow hover:shadow-xl"
+      className={`synoptic-card group absolute flex cursor-move flex-col rounded-lg border-2 bg-white text-slate-800 shadow-md transition-shadow hover:shadow-xl ${selected ? "border-violet-600 ring-4 ring-violet-300/40" : "border-slate-700"}`}
       style={{
         left: node.x,
         top: node.y,
@@ -641,6 +813,14 @@ function DeviceNodeCard({
         </div>
 
         {/* Bouton supprimer */}
+        <button
+          type="button"
+          onClick={(event) => { event.stopPropagation(); onTrace(); }}
+          className="ml-1 opacity-0 group-hover:opacity-100 p-1 text-cyan-600 hover:text-cyan-800 transition"
+          title="Tracer le flux du signal"
+        >
+          <Zap size={12} />
+        </button>
         <button
           type="button"
           onClick={() => onRemove(node.id)}
@@ -695,6 +875,12 @@ function DeviceNodeCard({
               <span>{node.warningBadge}</span>
             </div>
           )}
+          {error && (
+            <div className={`mt-2 flex items-center gap-1 rounded px-1.5 py-0.5 text-[8.5px] font-bold ${error.severity === "error" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+              <AlertTriangle size={10} />
+              <span className="truncate">{error.message}</span>
+            </div>
+          )}
         </div>
 
         {/* Colonne OUT (Droite) */}
@@ -728,6 +914,7 @@ function DeviceNodeCard({
     </div>
   );
 }
+)
 
 function DeviceIllustration({ deviceType }: { deviceType: SynopticDeviceType }) {
   switch (deviceType) {

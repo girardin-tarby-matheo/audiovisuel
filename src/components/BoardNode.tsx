@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, type PointerEvent as ReactPointerEvent } from "react";
+import { useRef, useEffect, useCallback, memo, type PointerEvent as ReactPointerEvent } from "react";
 import { ItemGlyph } from "./ItemGlyph";
 import { VisualAsset } from "./VisualAsset";
 import { CATALOG_MAP } from "../lib/catalog";
@@ -7,17 +7,19 @@ import type { BoardObject } from "../lib/types";
 type Props = {
   item: BoardObject;
   selected: boolean;
+  selectedItems: BoardObject[];
   panActive: boolean;
   zoom: number;
-  onSelect: (id: string) => void;
+  onSelect: (id: string, additive?: boolean) => void;
   onMove: (id: string, x: number, y: number) => void;
+  onMoveMany: (moves: Array<{ id: string; x: number; y: number }>) => void;
   onUpdate: (id: string, patch: Partial<BoardObject>) => void;
   onRemove: (id: string) => void;
 };
 
-export function BoardNode({ item, selected, panActive, zoom, onSelect, onMove, onUpdate, onRemove }: Props) {
+export const BoardNode = memo(function BoardNode({ item, selected, selectedItems, panActive, zoom, onSelect, onMove, onMoveMany, onUpdate, onRemove }: Props) {
   const nodeRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
+  const dragRef = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number; groupOrigins: Array<{ id: string; x: number; y: number }> } | null>(null);
   const controlRef = useRef<{ type: "rotation" | "beam" | "camera" | "resize"; pointerId: number; startX?: number; startY?: number; startWidth?: number; startHeight?: number } | null>(null);
   const size = 52 * item.scale;
   const defaults = CATALOG_MAP[item.catalogId]?.defaults;
@@ -43,15 +45,28 @@ export function BoardNode({ item, selected, panActive, zoom, onSelect, onMove, o
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
-    dragRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, originX: item.x, originY: item.y };
-    onSelect(item.id);
+    const groupOrigins = selected && selectedItems.some((selectedItem) => selectedItem.id === item.id)
+      ? selectedItems.map(({ id, x, y }) => ({ id, x, y }))
+      : [{ id: item.id, x: item.x, y: item.y }];
+    dragRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, originX: item.x, originY: item.y, groupOrigins };
+    onSelect(item.id, event.shiftKey || event.ctrlKey || event.metaKey);
   };
 
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     event.preventDefault();
-    onMove(item.id, drag.originX + (event.clientX - drag.startX) / zoom, drag.originY + (event.clientY - drag.startY) / zoom);
+    const dx = (event.clientX - drag.startX) / zoom;
+    const dy = (event.clientY - drag.startY) / zoom;
+    if (selected && selectedItems.some((selectedItem) => selectedItem.id === item.id)) {
+      onMoveMany(drag.groupOrigins.map((selectedItem) => ({
+        id: selectedItem.id,
+        x: selectedItem.x + dx,
+        y: selectedItem.y + dy,
+      })));
+    } else {
+      onMove(item.id, drag.originX + dx, drag.originY + dy);
+    }
   };
 
   const onControlPointerDown = (type: "rotation" | "beam" | "camera" | "resize", event: ReactPointerEvent<HTMLDivElement>) => {
@@ -432,3 +447,4 @@ export function BoardNode({ item, selected, panActive, zoom, onSelect, onMove, o
     </div>
   );
 }
+)
