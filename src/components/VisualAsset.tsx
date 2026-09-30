@@ -16,7 +16,20 @@ export function VisualAsset({ visualKey, image, fit, background, fallback, class
   const visual = getVisual(visualKey);
   const source = image ?? visual.image;
 
-  if (!source) return <span className={className}>{fallback}</span>;
+  if (!source) {
+    return (
+      <span
+        className={`visual-asset ${className}`}
+        style={{
+          background: background ?? visual.background ?? "#e2e8f0",
+          borderRadius: visual.radius ?? "0.5rem",
+        }}
+        aria-hidden={alt ? undefined : true}
+      >
+        {fallback}
+      </span>
+    );
+  }
 
   return (
     <span

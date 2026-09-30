@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import { CATALOG, CATALOG_MAP } from "../lib/catalog";
 import { SYNOPTIC_TEMPLATES } from "../lib/synopticTemplates";
 import { GRID_SIZE } from "../lib/constants";
+import { computeSynopticAutoLayout } from "../lib/synopticLayout";
 import type { BoardLayer, BoardObject, BoardStatus, CableType, CameraView, CatalogItem, SynopticLink, SynopticNode, ToolMode, ViewMode } from "../lib/types";
 
 const uid = () =>
@@ -144,6 +145,7 @@ type StudioState = {
   saveItemToCatalog: (itemId: string) => void;
   generateSynoptic: () => void;
   addSynopticNode: (custom?: Partial<SynopticNode>) => void;
+  addSynopticNodeFromCatalog: (catalogId: string) => void;
   updateSynopticNode: (id: string, patch: Partial<SynopticNode>) => void;
   moveSynopticNode: (id: string, x: number, y: number) => void;
   moveSynopticNodes: (moves: Array<{ id: string; x: number; y: number }>) => void;
@@ -155,7 +157,7 @@ type StudioState = {
   exportProject: () => string;
   importProject: (json: string) => void;
   importEquipmentList: (content: string) => void;
-  autoLayoutSynoptic: () => void;
+  autoLayoutSynoptic: () => SynopticNode[];
 };
 
 export const useStudio = create<StudioState>()(
@@ -347,6 +349,8 @@ export const useStudio = create<StudioState>()(
                 ...(patch.short ? { subtitle: patch.short } : {}),
                 ...(patch.color ? { color: patch.color } : {}),
                 ...(patch.image !== undefined ? { image: patch.image } : {}),
+                ...(patch.fit !== undefined ? { fit: patch.fit } : {}),
+                ...(patch.background !== undefined ? { background: patch.background } : {}),
                 ...(patch.portsIn !== undefined ? { portsIn: structuredClone(patch.portsIn) } : {}),
                 ...(patch.portsOut !== undefined ? { portsOut: structuredClone(patch.portsOut) } : {}),
                 ...(patch.needsPower !== undefined ? { needsPower: patch.needsPower } : {}),
@@ -393,8 +397,25 @@ export const useStudio = create<StudioState>()(
       },
 
       resetCatalog: () => {
+        const resetItems = get().items.map((boardItem) => {
+          const source = CATALOG_MAP[boardItem.catalogId] ?? CATALOG.find((item) => item.id === boardItem.catalogId);
+          if (!source) return boardItem;
+          return {
+            ...boardItem,
+            name: source.name,
+            label: source.short,
+            notes: source.description,
+            color: source.color,
+            image: source.image,
+            fit: source.fit,
+            background: source.background,
+            layer: getBoardLayer(source),
+            specs: source.specs ? structuredClone(source.specs) : undefined,
+          };
+        });
         set({
           catalog: CATALOG,
+          items: resetItems,
           toast: "Bibliothèque réinitialisée aux valeurs d'usine",
         });
       },
@@ -500,9 +521,12 @@ export const useStudio = create<StudioState>()(
             sourceId: cam.id,
             title: cam.name || `Caméra ${i + 1}`,
             subtitle: cam.label || "Sortie HDMI / SDI",
+            category: cam.category,
             deviceType: camTemplate.deviceType,
             color: cam.color || camTemplate.color,
             image: cam.image,
+            fit: cam.fit,
+            background: cam.background,
             visualKey: cam.visualKey ?? cam.catalogId,
             x: 160,
             y: 180 + i * 115,
@@ -534,9 +558,12 @@ export const useStudio = create<StudioState>()(
             sourceId: mic.id,
             title: mic.name || `Micro ${i + 1}`,
             subtitle: mic.label || "XLR",
+            category: mic.category,
             deviceType: micTemplate.deviceType,
             color: mic.color || micTemplate.color,
             image: mic.image,
+            fit: mic.fit,
+            background: mic.background,
             visualKey: mic.visualKey ?? mic.catalogId,
             x: 160,
             y: 670 + i * 95,
@@ -563,7 +590,7 @@ export const useStudio = create<StudioState>()(
           { templateId: "pc-stream", x: 1040, y: 120, linkFrom: atemId, fromPort: "pgm-usb-1", toPort: "usb-in" },
           { templateId: "pc-atem", x: 1160, y: 200 },
           { templateId: "headphone-monitor", x: 940, y: 280, linkFrom: atemId, fromPort: "audio-out-jack", toPort: "jack-in" },
-          { templateId: "hyperdeck", x: 940, y: 400, linkFrom: atemId, fromPort: "pgm-hdmi", toPort: "sdi-in", cable: "sdi" },
+          { templateId: "hyperdeck", x: 940, y: 400, linkFrom: atemId, fromPort: "pgm-hdmi", toPort: "hdmi-in", cable: "hdmi" },
           { templateId: "master-screen", x: 1200, y: 380, linkFrom: "hyperdeck-ref", fromPort: "hdmi-out", toPort: "hdmi-in" },
           { templateId: "multiview-screen", x: 940, y: 530, linkFrom: atemId, fromPort: "multiview-hdmi", toPort: "hdmi-in" },
           { templateId: "di-box", x: 790, y: 680, linkFrom: yamahaId, fromPort: "stereo-out-2", toPort: "jack-in" },
@@ -630,6 +657,36 @@ export const useStudio = create<StudioState>()(
           ...custom,
         };
         set({ synopticNodes: [...get().synopticNodes, defaultNode] });
+      },
+
+      addSynopticNodeFromCatalog: (catalogId) => {
+        const catalogItem = get().catalog.find((item) => item.id === catalogId);
+        if (!catalogItem) return;
+
+        const existingCount = get().synopticNodes.length;
+        const categoryDeviceType: SynopticNode["deviceType"] =
+          catalogItem.deviceType ??
+          (catalogItem.category === "camera" ? "camera" : catalogItem.category === "audio" ? "audio" : catalogItem.category === "light" ? "light" : "generic");
+        const defaultPortsIn = catalogItem.portsIn ?? (categoryDeviceType === "screen" || categoryDeviceType === "recorder" ? [{ id: `${catalogItem.id}-in`, name: "IN 1", type: "hdmi" as CableType }] : []);
+        const defaultPortsOut = catalogItem.portsOut ?? (categoryDeviceType === "camera" ? [{ id: `${catalogItem.id}-out`, name: "OUT 1", type: "hdmi" as CableType }] : []);
+
+        get().addSynopticNode({
+          title: catalogItem.name,
+          subtitle: catalogItem.short,
+          category: catalogItem.category,
+          deviceType: categoryDeviceType,
+          color: catalogItem.color,
+          visualKey: catalogItem.visualKey ?? catalogItem.id,
+          image: catalogItem.image,
+          fit: catalogItem.fit,
+          background: catalogItem.background,
+          x: 120 + (existingCount % 3) * 280,
+          y: 120 + Math.floor(existingCount / 3) * 220,
+          portsIn: structuredClone(defaultPortsIn),
+          portsOut: structuredClone(defaultPortsOut),
+          needsPower: catalogItem.needsPower ?? (catalogItem.category === "camera" || catalogItem.category === "light"),
+          warningBadge: catalogItem.warningBadge,
+        });
       },
 
       updateSynopticNode: (id, patch) => {
@@ -729,11 +786,11 @@ export const useStudio = create<StudioState>()(
             title: data.title || "Sans titre",
             status: data.status || "prep",
             items: Array.isArray(data.items) ? data.items.map((item: BoardObject) => ({ ...item, layer: getBoardLayer(item) })) : [],
-            catalog: data.catalog || CATALOG,
+            catalog: Array.isArray(data.catalog) ? data.catalog : CATALOG,
             camera: data.camera || { x: 80, y: 40, zoom: 1 },
             viewMode: data.viewMode || "plan",
-            synopticNodes: data.synopticNodes || [],
-            synopticLinks: data.synopticLinks || [],
+            synopticNodes: Array.isArray(data.synopticNodes) ? data.synopticNodes : [],
+            synopticLinks: Array.isArray(data.synopticLinks) ? data.synopticLinks : [],
             visibleLayers: { ...DEFAULT_VISIBLE_LAYERS, ...(data.visibleLayers || {}), accessories: data.visibleLayers?.accessories ?? data.visibleLayers?.data ?? true, lights: data.visibleLayers?.lights ?? data.visibleLayers?.power ?? true },
           });
           set({ toast: "Projet importé avec succès ✓" });
@@ -744,14 +801,23 @@ export const useStudio = create<StudioState>()(
 
       importEquipmentList: (content) => {
         try {
-          const parsed = content.trim().startsWith("[") ? JSON.parse(content) : content.trim().split(/\r?\n/).slice(1).map((line) => {
-            const [catalogId, x, y, label] = line.split(",").map((value) => value.trim());
-            return { catalogId, x: Number(x) || 400, y: Number(y) || 300, label };
-          });
+          const trimmed = content.trim();
+          const parsed = trimmed.startsWith("[") ? JSON.parse(trimmed) : (() => {
+            const lines = trimmed.split(/\r?\n/).filter(Boolean);
+            if (!lines.length) return [];
+            const firstColumns = lines[0].split(",").map((value) => value.trim().toLowerCase());
+            const hasHeader = firstColumns.some((value) => ["catalogid", "catalog", "name", "x", "y", "label"].includes(value));
+            const headers = hasHeader ? firstColumns : ["catalogid", "x", "y", "label"];
+            const rows = hasHeader ? lines.slice(1) : lines;
+            return rows.map((line) => {
+              const values = line.split(",").map((value) => value.trim().replace(/^"|"$/g, ""));
+              return Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""]));
+            });
+          })();
           const imported = parsed.map((entry: any, index: number) => {
             const catalogId = entry.catalogId || entry.id || entry.catalog || get().catalog.find((item) => item.name === entry.name)?.id;
             const item = catalogId ? fromCatalogWithList(get().catalog, catalogId, Number(entry.x) || 400 + index * 40, Number(entry.y) || 300 + index * 40) : null;
-            return item ? { ...item, ...(entry.name ? { name: entry.name } : {}), ...(entry.label ? { label: entry.label } : {}), ...(entry.layer ? { layer: entry.layer } : {}) } : null;
+            return item ? { ...item, ...(entry.name ? { name: entry.name } : {}), ...(entry.label ? { label: entry.label } : {}), ...(entry.layer ? { layer: getBoardLayer({ ...item, layer: entry.layer }) } : {}) } : null;
           }).filter((item): item is BoardObject => Boolean(item));
           if (!imported.length) throw new Error("Aucun équipement reconnu");
           set({ items: [...get().items, ...imported], selectedIds: imported.map((item) => item.id), selectedId: imported[imported.length - 1].id, toast: `${imported.length} équipement${imported.length > 1 ? "s" : ""} importé${imported.length > 1 ? "s" : ""} ✓` });
@@ -762,8 +828,12 @@ export const useStudio = create<StudioState>()(
 
       autoLayoutSynoptic: () => {
         const nodes = get().synopticNodes;
-        const next = nodes.map((node, index) => ({ ...node, x: 120 + (index % 4) * 300, y: 120 + Math.floor(index / 4) * 220 }));
-        set({ synopticNodes: next, toast: "Synoptique réorganisé ✓" });
+        const links = get().synopticLinks;
+        if (!nodes.length) return [];
+
+        const nextNodes = computeSynopticAutoLayout(nodes, links);
+        set({ synopticNodes: nextNodes, toast: "Synoptique réorganisé selon les flux ✓" });
+        return nextNodes;
       },
 
       resetBoard: () =>

@@ -122,7 +122,7 @@ export const SYNOPTIC_TEMPLATES: Record<string, SynopticTemplate> = {
     deviceType: "recorder",
     color: "#ef4444",
     portsIn: [
-      { id: "sdi-in", name: "SDI", type: "sdi" as CableType },
+      { id: "hdmi-in", name: "HDMI", type: "hdmi" as CableType },
     ],
     portsOut: [
       { id: "hdmi-out", name: "HDMI", type: "hdmi" as CableType },

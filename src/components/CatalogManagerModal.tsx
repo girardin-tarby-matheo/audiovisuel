@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, type ChangeEvent, type DragEvent } from "react";
+import { useState, useMemo, useEffect, type ChangeEvent, type DragEvent } from "react";
 import {
   X,
   Plus,
@@ -20,6 +20,7 @@ import {
 import { useStudio } from "../store/studioStore";
 import { CATEGORIES } from "../lib/catalog";
 import { CABLE_COLORS } from "../lib/constants";
+import { createCatalogEditorSnapshot, shouldSyncCatalogEditor } from "../lib/catalogEditorState";
 import { ItemGlyph } from "./ItemGlyph";
 import { VisualAsset } from "./VisualAsset";
 import type { Category, CatalogItem, CableType, SynopticPort, SynopticDeviceType } from "../lib/types";
@@ -85,18 +86,27 @@ export function CatalogManagerModal() {
   const [formState, setFormState] = useState<CatalogItem | null>(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
-  // Sync form state when selection changes
-  const currentActiveId = isCreatingNew ? "new" : selectedItem?.id;
-  const lastActiveIdRef = useRef<string | null>(null);
+  // Sync form state when selection changes without updating React state during render.
+  const currentActiveId = isCreatingNew ? "new" : selectedItem?.id ?? null;
 
-  if (lastActiveIdRef.current !== currentActiveId && !isCreatingNew && selectedItem) {
-    lastActiveIdRef.current = currentActiveId;
-    setFormState({
-      ...selectedItem,
-      portsIn: selectedItem.portsIn ? [...selectedItem.portsIn] : [],
-      portsOut: selectedItem.portsOut ? [...selectedItem.portsOut] : [],
+  useEffect(() => {
+    if (isCreatingNew) {
+      return;
+    }
+
+    if (!selectedItem) {
+      setFormState(null);
+      return;
+    }
+
+    const nextFormState = createCatalogEditorSnapshot(selectedItem);
+    setFormState((current) => {
+      if (!shouldSyncCatalogEditor(current, nextFormState)) {
+        return current;
+      }
+      return nextFormState;
     });
-  }
+  }, [currentActiveId, isCreatingNew, selectedItem]);
 
   // Filter items
   const query = search.toLowerCase().trim();
@@ -120,7 +130,6 @@ export function CatalogManagerModal() {
 
   const startCreateNew = () => {
     setIsCreatingNew(true);
-    lastActiveIdRef.current = "new";
     setFormState({
       id: `custom-${Date.now()}`,
       name: "Nouvel objet personnalisé",
@@ -405,7 +414,7 @@ export function CatalogManagerModal() {
 
           {/* Right Column : Item Editor */}
           {formState ? (
-            <div className="scrollbar-thin flex-1 overflow-y-auto p-6 space-y-6">
+            <div className="scrollbar-thin min-w-0 flex-1 space-y-6 overflow-x-hidden overflow-y-auto p-6">
               {/* Header preview banner */}
               <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-gradient-to-r from-white/[0.04] to-transparent p-4">
                 <div className="flex items-center gap-4">
@@ -658,7 +667,7 @@ export function CatalogManagerModal() {
                   </div>
 
                   {/* Power & Warning options */}
-                  <div className="flex items-center gap-4">
+                  <div className="flex w-full flex-wrap items-center gap-3 lg:w-auto lg:gap-4">
                     <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-300 hover:text-white">
                       <input
                         type="checkbox"
@@ -671,12 +680,12 @@ export function CatalogManagerModal() {
                       </span>
                     </label>
 
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex min-w-0 items-center gap-1.5">
                       <span className="text-[10px] text-slate-400">Type de boîtier :</span>
                       <select
                         value={formState.deviceType ?? "generic"}
                         onChange={(e) => setFormState({ ...formState, deviceType: e.target.value as SynopticDeviceType })}
-                        className="field text-xs py-1"
+                        className="field min-w-0 flex-1 text-xs py-1 lg:w-56 lg:flex-none"
                       >
                         {DEVICE_TYPES.map((dt) => (
                           <option key={dt.id} value={dt.id} className="bg-[#121620]">
@@ -689,10 +698,10 @@ export function CatalogManagerModal() {
                 </div>
 
                 {/* Ports Columns : IN (Left) and OUT (Right) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                   {/* Entrées (IN) */}
                   <div className="rounded-xl border border-white/8 bg-black/20 p-3 space-y-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5">
                         <span className="rounded bg-cyan-500/20 px-1.5 py-0.5 font-bold text-[10px] text-cyan-300">
                           IN
@@ -703,7 +712,7 @@ export function CatalogManagerModal() {
                       </div>
 
                       {/* Add port buttons */}
-                      <div className="flex items-center gap-1">
+                      <div className="flex flex-wrap items-center justify-end gap-1">
                         <button
                           type="button"
                           onClick={() => addPort("in", "hdmi")}
@@ -742,7 +751,7 @@ export function CatalogManagerModal() {
                         return (
                           <div
                             key={port.id}
-                            className="flex items-center gap-2 rounded-lg border border-white/6 bg-white/[0.02] p-1.5"
+                            className="grid min-w-0 grid-cols-[auto_auto_minmax(0,1fr)_5rem_auto] items-center gap-2 rounded-lg border border-white/6 bg-white/[0.02] p-1.5"
                           >
                             <span className="font-mono text-[9px] text-slate-500 w-4 text-center">
                               #{idx + 1}
@@ -756,12 +765,12 @@ export function CatalogManagerModal() {
                               value={port.name}
                               onChange={(e) => updatePort("in", port.id, { name: e.target.value })}
                               placeholder="Nom du port"
-                              className="field text-xs py-1 flex-1 font-medium"
+                              className="field min-w-0 w-full text-xs py-1 font-medium"
                             />
                             <select
                               value={port.type}
                               onChange={(e) => updatePort("in", port.id, { type: e.target.value as CableType })}
-                              className="field text-[11px] py-1 w-28 shrink-0"
+                              className="field min-w-0 w-full text-[11px] py-1"
                             >
                               {CABLE_TYPES.map((ct) => (
                                 <option key={ct.id} value={ct.id} className="bg-[#121620]">
@@ -791,7 +800,7 @@ export function CatalogManagerModal() {
 
                   {/* Sorties (OUT) */}
                   <div className="rounded-xl border border-white/8 bg-black/20 p-3 space-y-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5">
                         <span className="rounded bg-violet-500/20 px-1.5 py-0.5 font-bold text-[10px] text-violet-300">
                           OUT
@@ -802,7 +811,7 @@ export function CatalogManagerModal() {
                       </div>
 
                       {/* Add port buttons */}
-                      <div className="flex items-center gap-1">
+                      <div className="flex flex-wrap items-center justify-end gap-1">
                         <button
                           type="button"
                           onClick={() => addPort("out", "hdmi")}
@@ -848,7 +857,7 @@ export function CatalogManagerModal() {
                         return (
                           <div
                             key={port.id}
-                            className="flex items-center gap-2 rounded-lg border border-white/6 bg-white/[0.02] p-1.5"
+                            className="grid min-w-0 grid-cols-[auto_auto_minmax(0,1fr)_5rem_auto] items-center gap-2 rounded-lg border border-white/6 bg-white/[0.02] p-1.5"
                           >
                             <span className="font-mono text-[9px] text-slate-500 w-4 text-center">
                               #{idx + 1}
@@ -862,12 +871,12 @@ export function CatalogManagerModal() {
                               value={port.name}
                               onChange={(e) => updatePort("out", port.id, { name: e.target.value })}
                               placeholder="Nom du port"
-                              className="field text-xs py-1 flex-1 font-medium"
+                              className="field min-w-0 w-full text-xs py-1 font-medium"
                             />
                             <select
                               value={port.type}
                               onChange={(e) => updatePort("out", port.id, { type: e.target.value as CableType })}
-                              className="field text-[11px] py-1 w-28 shrink-0"
+                              className="field min-w-0 w-full text-[11px] py-1"
                             >
                               {CABLE_TYPES.map((ct) => (
                                 <option key={ct.id} value={ct.id} className="bg-[#121620]">

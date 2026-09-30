@@ -26,6 +26,11 @@ export function TopBar({ onOpenProjects }: { onOpenProjects: () => void }) {
     if (shareState !== "idle") return;
     setShareState("busy");
     const url = `${window.location.origin}/share/preview?data=${encodeURIComponent(exportProject())}`;
+    if (url.length > 8000) {
+      setToast("Projet trop volumineux pour un lien partageable · Exportez le JSON");
+      setShareState("idle");
+      return;
+    }
     try {
       await navigator.clipboard.writeText(url);
       setToast(`Lien copié · ${url}`);
@@ -69,7 +74,7 @@ export function TopBar({ onOpenProjects }: { onOpenProjects: () => void }) {
       setExportState("idle");
       setToast(null);
     }, 2600);
-  }, [exportState, title, setToast]);
+  }, [exportState, title, viewMode, setToast]);
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/6 bg-[#0c0e14]/95 px-4">

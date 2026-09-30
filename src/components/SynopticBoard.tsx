@@ -18,9 +18,12 @@ import {
   Maximize2,
   X,
   AlertTriangle,
+  Search,
 } from "lucide-react";
 import { useStudio } from "../store/studioStore";
 import { VisualAsset } from "./VisualAsset";
+import { ItemGlyph } from "./ItemGlyph";
+import { CATEGORIES } from "../lib/catalog";
 import { ValidationPanel } from "./ValidationPanel";
 import { CABLE_COLORS } from "../lib/constants";
 import { validateSynoptic } from "../lib/validation";
@@ -58,12 +61,15 @@ type LinkingState = {
   currentY: number;
 };
 
+const CABLE_TYPES: CableType[] = ["hdmi", "sdi", "xlr", "jack", "usb"];
+
 export function SynopticBoard() {
   const nodesMap = useStudio((state) => state.synopticNodes);
   const nodes = useMemo(() => Object.values(nodesMap), [nodesMap]);
   const links = useStudio((state) => state.synopticLinks);
   const generateSynoptic = useCallback(useStudio((state) => state.generateSynoptic), []);
   const addSynopticNode = useCallback(useStudio((state) => state.addSynopticNode), []);
+  const addSynopticNodeFromCatalog = useCallback(useStudio((state) => state.addSynopticNodeFromCatalog), []);
   const updateSynopticNode = useCallback(useStudio((state) => state.updateSynopticNode), []);
   const moveSynopticNode = useCallback(useStudio((state) => state.moveSynopticNode), []);
   const moveSynopticNodes = useCallback(useStudio((state) => state.moveSynopticNodes), []);
@@ -71,6 +77,7 @@ export function SynopticBoard() {
   const toggleSynopticPower = useCallback(useStudio((state) => state.toggleSynopticPower), []);
   const addSynopticLink = useCallback(useStudio((state) => state.addSynopticLink), []);
   const removeSynopticLink = useCallback(useStudio((state) => state.removeSynopticLink), []);
+  const updateSynopticLink = useCallback(useStudio((state) => state.updateSynopticLink), []);
   const setToast = useCallback(useStudio((state) => state.setToast), []);
   const highlightedNodeIds = useStudio((state) => state.highlightedNodeIds);
   const highlightedLinkIds = useStudio((state) => state.highlightedLinkIds);
@@ -100,10 +107,82 @@ export function SynopticBoard() {
 
   const [linking, setLinking] = useState<LinkingState | null>(null);
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [catalogSearch, setCatalogSearch] = useState("");
   const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [marquee, setMarquee] = useState<{ startX: number; startY: number; x: number; y: number } | null>(null);
   const [showValidation, setShowValidation] = useState(false);
+  const selectedLink = useMemo(() => links.find((link) => link.id === selectedLinkId) ?? null, [links, selectedLinkId]);
+  const isBoardEmpty = nodes.length === 0;
+  const selectedNodeCount = selectedNodeIds.length;
+  const stats = useMemo(() => ({
+    devices: nodes.length,
+    links: links.length,
+    issues: validationErrors.length,
+  }), [nodes.length, links.length, validationErrors.length]);
+  const catalog = useStudio((state) => state.catalog);
+  const filteredCatalog = useMemo(() => {
+    const query = catalogSearch.trim().toLowerCase();
+    if (!query) return catalog;
+    return catalog.filter((item) =>
+      [item.name, item.short, item.description].some((value) => value.toLowerCase().includes(query)),
+    );
+  }, [catalog, catalogSearch]);
+
+  const removeSelected = useCallback(() => {
+    if (selectedLinkId) {
+      removeSynopticLink(selectedLinkId);
+      setSelectedLinkId(null);
+      return;
+    }
+
+    if (!selectedNodeIds.length) return;
+    selectedNodeIds.forEach((nodeId) => removeSynopticNode(nodeId));
+    setSelectedNodeIds([]);
+  }, [removeSynopticLink, removeSynopticNode, selectedLinkId, selectedNodeIds]);
+
+  useEffect(() => {
+    if (!selectedLinkId) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest(".link-editor-popup, .synoptic-link")) return;
+      setSelectedLinkId(null);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
+  }, [selectedLinkId]);
+
+  useEffect(() => {
+    const closeAddMenu = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest(".synoptic-ui")) return;
+      setShowAddMenu(false);
+    };
+
+    document.addEventListener("pointerdown", closeAddMenu);
+    return () => document.removeEventListener("pointerdown", closeAddMenu);
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const isTyping = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable;
+      if (isTyping) return;
+
+      if ((event.key === "Delete" || event.key === "Backspace") && (selectedLinkId || selectedNodeIds.length)) {
+        event.preventDefault();
+        removeSelected();
+      }
+
+      if (event.key === "Escape") {
+        setSelectedLinkId(null);
+        setSelectedNodeIds([]);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [removeSelected, selectedLinkId, selectedNodeIds]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
@@ -133,14 +212,21 @@ export function SynopticBoard() {
     if (event.button !== 0 || (event.target as HTMLElement).closest("input,button,.port-handle")) return;
     event.preventDefault();
     event.stopPropagation();
+
     const additive = event.shiftKey || event.ctrlKey || event.metaKey;
-    setSelectedNodeIds((current) => additive
-      ? current.includes(node.id) ? current.filter((id) => id !== node.id) : [...current, node.id]
-      : [node.id]);
+    const nextSelected = additive
+      ? selectedNodeIds.includes(node.id)
+        ? selectedNodeIds.filter((id) => id !== node.id)
+        : [...selectedNodeIds, node.id]
+      : [node.id];
+
+    setSelectedNodeIds(nextSelected);
     event.currentTarget.setPointerCapture(event.pointerId);
-    const groupOrigins = selectedNodeIds.includes(node.id)
-      ? nodes.filter((candidate) => selectedNodeIds.includes(candidate.id)).map(({ id, x, y }) => ({ id, x, y }))
+
+    const groupOrigins = nextSelected.includes(node.id)
+      ? nodes.filter((candidate) => nextSelected.includes(candidate.id)).map(({ id, x, y }) => ({ id, x, y }))
       : [{ id: node.id, x: node.x, y: node.y }];
+
     dragRef.current = {
       id: node.id,
       pointerId: event.pointerId,
@@ -182,6 +268,8 @@ export function SynopticBoard() {
       return;
     }
     if (e.button !== 0) return;
+    setSelectedLinkId(null);
+    setSelectedNodeIds([]);
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
     const startX = e.clientX - rect.left;
@@ -371,17 +459,10 @@ export function SynopticBoard() {
     [nodeMap, pan, zoom]
   );
 
-  const addPresetDevice = (deviceType: SynopticDeviceType, title: string, subtitle: string, inputCount: number, outputCount: number, needsPower: boolean) => {
-    const stamp = Date.now();
-    addSynopticNode({
-      deviceType,
-      title,
-      subtitle,
-      needsPower,
-      portsIn: Array.from({ length: inputCount }, (_, index) => ({ id: `${stamp}-in-${index}`, name: `IN ${index + 1}`, type: (deviceType === "mic" ? "xlr" : "hdmi") as CableType })),
-      portsOut: Array.from({ length: outputCount }, (_, index) => ({ id: `${stamp}-out-${index}`, name: `OUT ${index + 1}`, type: (deviceType === "mic" ? "xlr" : "hdmi") as CableType })),
-    });
+  const addCatalogDevice = (catalogId: string) => {
+    addSynopticNodeFromCatalog(catalogId);
     setShowAddMenu(false);
+    setCatalogSearch("");
   };
 
   // Dépôt d'un élément depuis la sidebar
@@ -411,17 +492,60 @@ export function SynopticBoard() {
     [pan, zoom, addSynopticNode, setToast]
   );
 
+  const autoLayoutAndFit = () => {
+    const layoutNodes = autoLayoutSynoptic();
+    if (!layoutNodes.length) return;
+    const viewportWidth = containerRef.current?.clientWidth ?? 1200;
+    const viewportHeight = containerRef.current?.clientHeight ?? 800;
+    const bounds = layoutNodes.reduce(
+      (current, node) => {
+        const width = node.width || (node.deviceType === "mixer" ? 280 : node.deviceType === "audio" ? 250 : 200);
+        const height = node.height || 150;
+        return {
+          minX: Math.min(current.minX, node.x),
+          minY: Math.min(current.minY, node.y),
+          maxX: Math.max(current.maxX, node.x + width),
+          maxY: Math.max(current.maxY, node.y + height),
+        };
+      },
+      { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity },
+    );
+    const contentWidth = Math.max(bounds.maxX - bounds.minX, 400);
+    const contentHeight = Math.max(bounds.maxY - bounds.minY, 300);
+    const nextZoom = Math.min(1.2, Math.max(0.45, Math.min(viewportWidth / contentWidth, viewportHeight / contentHeight) * 0.86));
+    setZoom(nextZoom);
+    setPan({
+      x: (viewportWidth - contentWidth * nextZoom) / 2 - bounds.minX * nextZoom,
+      y: (viewportHeight - contentHeight * nextZoom) / 2 - bounds.minY * nextZoom,
+    });
+  };
+
 
   return (
     <section className="relative min-w-0 flex-1 overflow-hidden select-none bg-[#f8fafc] text-slate-800">
       {/* Barre d'outils supérieure */}
-      <div className="synoptic-ui absolute left-4 top-3 z-30 flex items-center gap-3">
+      <div className="synoptic-ui absolute left-4 top-3 z-30 flex flex-wrap items-center gap-2.5">
         <div className="rounded-xl border border-slate-300 bg-white/95 px-3 py-1.5 shadow-md backdrop-blur">
           <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-violet-600 animate-pulse" />
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-800">Mode Synoptique</p>
+            <span className="h-2.5 w-2.5 rounded-full bg-violet-600 animate-pulse" />
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-800">Mode Synoptique</p>
           </div>
-          <p className="text-[10px] text-slate-500">Câblage technique (hors mobilier et personnes)</p>
+          <p className="text-[10px] text-slate-500">Câblage technique · {stats.devices} appareils · {stats.links} liaisons</p>
+        </div>
+
+        <div className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white/90 px-1.5 py-1 shadow-sm backdrop-blur">
+          <span className="rounded-lg bg-violet-100 px-2 py-1 text-[10px] font-semibold text-violet-700">{stats.devices}</span>
+          <span className="text-[10px] font-medium text-slate-500">Appareils</span>
+          <span className="mx-1 h-3 w-px bg-slate-200" />
+          <span className="rounded-lg bg-cyan-100 px-2 py-1 text-[10px] font-semibold text-cyan-700">{stats.links}</span>
+          <span className="text-[10px] font-medium text-slate-500">Liens</span>
+          {stats.issues > 0 && (
+            <>
+              <span className="mx-1 h-3 w-px bg-slate-200" />
+              <span className="rounded-lg bg-amber-100 px-2 py-1 text-[10px] font-semibold text-amber-700">{stats.issues}</span>
+              <span className="text-[10px] font-medium text-slate-500">Alerte</span>
+            </>
+          )}
         </div>
 
         <button
@@ -431,7 +555,7 @@ export function SynopticBoard() {
           title="Regénérer le synoptique à partir des caméras et équipements du plan"
         >
           <RefreshCw size={13} className="text-violet-600" />
-          Regénérer depuis le plan
+          Regénérer
         </button>
 
         <div className="relative">
@@ -441,64 +565,103 @@ export function SynopticBoard() {
             className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-violet-700 active:scale-95"
           >
             <Plus size={14} />
-            Ajouter un appareil
+            Ajouter
           </button>
 
           {showAddMenu && (
-            <div className="absolute left-0 top-full mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl z-40">
-              <p className="px-2 py-1 text-[10px] font-bold uppercase text-slate-400">Équipements types</p>
-              <button
-                type="button"
-                onClick={() => addPresetDevice("camera", "Caméra XA45", "Sortie HDMI / SDI", 0, 1, true)}
-                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-100"
-              >
-                <Video size={14} className="text-cyan-600" /> Caméra vidéo
-              </button>
-              <button
-                type="button"
-                onClick={() => addPresetDevice("mic", "Micro HF / Cravate", "Émetteur sans fil", 0, 1, false)}
-                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-100"
-              >
-                <Mic size={14} className="text-blue-600" /> Microphone
-              </button>
-              <button
-                type="button"
-                onClick={() => addPresetDevice("screen", "Moniteur vidéo", "Écran de contrôle", 1, 0, true)}
-                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-100"
-              >
-                <Tv size={14} className="text-amber-600" /> Écran / Moniteur
-              </button>
-              <button
-                type="button"
-                onClick={() => addPresetDevice("computer", "PC / Laptop", "Diffusion / Encodage", 1, 1, true)}
-                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-100"
-              >
-                <Laptop size={14} className="text-emerald-600" /> Ordinateur portable
-              </button>
-              <button
-                type="button"
-                onClick={() => addPresetDevice("converter", "Convertisseur SDI/HDMI", "Boîtier micro convert", 1, 1, true)}
-                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-100"
-              >
-                <Layers size={14} className="text-purple-600" /> Convertisseur vidéo
-              </button>
-              <button
-                type="button"
-                onClick={() => addPresetDevice("recorder", "HyperDeck Enregistreur", "Master recording", 1, 1, true)}
-                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-100"
-              >
-                <Disc size={14} className="text-rose-600" /> Enregistreur Master
-              </button>
+            <div className="absolute left-0 top-full z-40 mt-2 w-80 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl">
+              <div className="relative mb-2">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={catalogSearch}
+                  onChange={(event) => setCatalogSearch(event.target.value)}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  placeholder="Rechercher dans la bibliothèque..."
+                  aria-label="Rechercher un équipement à ajouter"
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-8 pr-2 text-xs text-slate-700 outline-none focus:border-violet-400"
+                />
+              </div>
+              <div className="max-h-[min(60vh,420px)] space-y-3 overflow-y-auto pr-1">
+                {CATEGORIES.map((category) => {
+                  const categoryItems = filteredCatalog.filter((item) => item.category === category.id);
+                  if (!categoryItems.length) return null;
+                  return (
+                    <section key={category.id}>
+                      <p className="px-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-600">{category.label}</p>
+                      <div className="grid grid-cols-2 gap-1">
+                        {categoryItems.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => addCatalogDevice(item.id)}
+                            className="flex min-w-0 items-center gap-2 rounded-lg px-2 py-2 text-left text-xs font-medium text-slate-700 hover:bg-violet-50 hover:text-violet-800"
+                            title={item.description}
+                          >
+                            <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md bg-slate-100">
+                              <VisualAsset
+                                visualKey={item.visualKey ?? item.id}
+                                image={item.image}
+                                fit={item.fit}
+                                background={item.background}
+                                className="h-7 w-7"
+                                alt=""
+                                fallback={<ItemGlyph category={item.category} catalogId={item.id} color={item.color} size={22} />}
+                              />
+                            </span>
+                            <span className="min-w-0 truncate">{item.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })}
+                {!filteredCatalog.length && <p className="px-2 py-5 text-center text-xs text-slate-500">Aucun équipement trouvé.</p>}
+              </div>
             </div>
           )}
         </div>
         <button type="button" onClick={() => setShowValidation((open) => !open)} className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50" title="Afficher les erreurs techniques">
           <AlertTriangle size={13} className="text-amber-600" /> Validation
         </button>
-        <button type="button" onClick={autoLayoutSynoptic} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50" title="Aligner automatiquement les équipements">Auto-layout</button>
+        <button type="button" onClick={autoLayoutAndFit} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50" title="Aligner automatiquement les équipements">Auto-layout</button>
         {highlightedNodeIds.length > 0 && <button type="button" onClick={clearSignalTrace} className="rounded-xl border border-cyan-300 bg-cyan-50 px-3 py-2 text-xs font-semibold text-cyan-700 shadow-sm">Effacer le flux</button>}
       </div>
       {showValidation && <ValidationPanel onClose={() => setShowValidation(false)} />}
+      {!isBoardEmpty && (selectedLink || selectedNodeCount > 0) && (
+        <div className="synoptic-ui absolute bottom-4 left-4 z-40 flex items-center gap-2 rounded-2xl border border-slate-300 bg-white/95 p-2 shadow-xl backdrop-blur">
+          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            <span className="rounded-lg bg-violet-100 px-2 py-1 text-violet-700">{selectedLink ? "Lien" : `${selectedNodeCount} sel.`}</span>
+            <span className="text-slate-400">{selectedLink ? "Câble sélectionné" : "Appareils sélectionnés"}</span>
+          </div>
+          <button
+            type="button"
+            onClick={removeSelected}
+            className="flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[10px] font-semibold text-red-700 transition hover:bg-red-100"
+          >
+            <Trash2 size={12} />
+            Supprimer
+          </button>
+        </div>
+      )}
+      {selectedLink && (
+        <div className="link-editor-popup synoptic-ui absolute bottom-4 left-4 z-40 w-64 rounded-xl border border-slate-300 bg-white p-3 shadow-xl">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Lien sélectionné</p>
+            <button type="button" onClick={() => setSelectedLinkId(null)} className="text-xs text-slate-400 hover:text-slate-700" aria-label="Fermer l’édition du lien">Fermer</button>
+          </div>
+          <label className="mb-2 block text-[10px] font-semibold uppercase text-slate-500">
+            Type de prise
+            <select value={selectedLink.cableType} onChange={(event) => updateSynopticLink(selectedLink.id, { cableType: event.target.value as CableType })} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700">
+              {CABLE_TYPES.map((type) => <option key={type} value={type}>{CABLE_COLORS[type].label}</option>)}
+            </select>
+          </label>
+          <label className="block text-[10px] font-semibold uppercase text-slate-500">
+            Libellé
+            <input value={selectedLink.label ?? ""} onChange={(event) => updateSynopticLink(selectedLink.id, { label: event.target.value || undefined })} placeholder="Ex. Caméra 1 → ATEM" className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-violet-500" />
+          </label>
+          <button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.preventDefault(); event.stopPropagation(); removeSynopticLink(selectedLink.id); setSelectedLinkId(null); }} className="mt-3 flex w-full items-center justify-center rounded-lg bg-red-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-red-700">Supprimer le lien</button>
+        </div>
+      )}
 
       {/* Légende en haut à droite (fidele à l'image fournie) */}
       <div className="synoptic-ui absolute right-4 top-3 z-30 rounded-2xl border border-slate-300 bg-white/95 p-3 shadow-lg backdrop-blur">
@@ -588,6 +751,33 @@ export function SynopticBoard() {
           backgroundPosition: "0 0, 12px 12px",
         }}
       >
+        {isBoardEmpty && (
+          <div className="absolute left-1/2 top-1/2 z-10 w-[min(520px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-violet-200 bg-white/90 p-6 text-center shadow-2xl backdrop-blur-sm">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-100 text-violet-700">
+              <Network size={28} />
+            </div>
+            <h3 className="mt-4 text-xl font-bold text-slate-900">Le synoptique est vide</h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              Génère une structure depuis le plan ou ajoute un premier équipement pour commencer le câblage technique.
+            </p>
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={generateSynoptic}
+                className="rounded-xl bg-violet-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-700"
+              >
+                Générer depuis le plan
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowAddMenu(true)}
+                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Ajouter un appareil
+              </button>
+            </div>
+          </div>
+        )}
         <div
           style={{
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
@@ -612,6 +802,7 @@ export function SynopticBoard() {
 
               const cableCfg = CABLE_COLORS[link.cableType] || CABLE_COLORS.hdmi;
               const isSelected = selectedLinkId === link.id;
+              const label = link.label?.trim();
 
               // Trajectoire Bézier fluide horizontale
               const dx = Math.abs(end.x - start.x) * 0.5;
@@ -619,7 +810,14 @@ export function SynopticBoard() {
                 } ${end.y}, ${end.x} ${end.y}`;
 
               return (
-                <g key={link.id} className="pointer-events-auto cursor-pointer" onClick={() => setSelectedLinkId(link.id)} opacity={highlightedLinkIds.length === 0 || highlightedLinkIds.includes(link.id) ? 1 : 0.18}>
+                <g
+                  key={link.id}
+                  className="synoptic-link pointer-events-auto cursor-pointer"
+                  onPointerDown={(event) => { event.stopPropagation(); setSelectedLinkId(link.id); }}
+                  onClick={(event) => { event.stopPropagation(); setSelectedLinkId(link.id); }}
+                  opacity={highlightedLinkIds.length === 0 || highlightedLinkIds.includes(link.id) ? 1 : 0.18}
+                >
+                  <path d={pathD} fill="none" stroke="transparent" strokeWidth="18" strokeLinecap="round" pointerEvents="stroke" />
                   {/* Contour de sélection */}
                   {isSelected && (
                     <path
@@ -644,6 +842,12 @@ export function SynopticBoard() {
                   <circle cx={start.x} cy={start.y} r="4" fill={cableCfg.color} />
                   {/* Point de connexion d'arrivée */}
                   <circle cx={end.x} cy={end.y} r="4" fill={cableCfg.color} />
+                  {label && (
+                    <g pointerEvents="none">
+                      <rect x={(start.x + end.x) / 2 - Math.min(label.length * 3.2, 90)} y={(start.y + end.y) / 2 - 12} width={Math.min(label.length * 6.4 + 12, 192)} height="18" rx="5" fill="white" fillOpacity="0.94" stroke={cableCfg.color} strokeOpacity="0.35" />
+                      <text x={(start.x + end.x) / 2} y={(start.y + end.y) / 2 + 1} textAnchor="middle" fontSize="10" fontWeight="600" fill="#334155">{label.slice(0, 28)}</text>
+                    </g>
+                  )}
                 </g>
               );
             })}
@@ -677,7 +881,9 @@ export function SynopticBoard() {
                   <button
                     type="button"
                     style={{ left: midX - 12, top: midY - 12 }}
+                    onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                     onClick={(e) => {
+                      e.preventDefault();
                       e.stopPropagation();
                       removeSynopticLink(link.id);
                       setSelectedLinkId(null);
@@ -832,9 +1038,9 @@ export const DeviceNodeCard = memo(function DeviceNodeCard({
       </div>
 
       {/* Colonnes IN / Centre (Visuel) / OUT */}
-      <div className="relative flex flex-1 items-stretch justify-between p-2">
+      <div className="relative flex min-w-0 flex-1 items-stretch justify-between gap-1 p-2">
         {/* Colonne IN (Gauche) */}
-        <div className="flex flex-col text-[10px]">
+        <div className="min-w-0 w-[34%] flex flex-col text-[10px]">
           {portsIn.length > 0 && (
             <span className="flex h-4 items-center text-[8px] font-bold uppercase tracking-wider text-slate-400">IN</span>
           )}
@@ -846,7 +1052,7 @@ export const DeviceNodeCard = memo(function DeviceNodeCard({
                 data-synoptic-node={node.id}
                 data-synoptic-port={port.id}
                 onPointerUp={(e) => onCompleteLinking(node, port, e)}
-                className="port-handle flex h-6 items-center gap-1.5 cursor-pointer rounded px-1 hover:bg-slate-100 transition"
+                className="port-handle flex h-6 min-w-0 max-w-full items-center gap-1.5 cursor-pointer rounded px-1 hover:bg-slate-100 transition"
                 title={`Entrée ${port.name} (${cableCfg.label}) - Déposer un câble ici`}
               >
                 <div
@@ -855,19 +1061,24 @@ export const DeviceNodeCard = memo(function DeviceNodeCard({
                 >
                   <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: cableCfg.color }} />
                 </div>
-                <span className="whitespace-nowrap font-semibold text-slate-700">{port.name}</span>
+                <span className="min-w-0 truncate font-semibold text-slate-700">{port.name} <span className="font-mono text-[8px] text-slate-400">({cableCfg.label})</span></span>
               </div>
             );
           })}
         </div>
 
         {/* Visuel central de l'équipement */}
-        <div className="flex flex-1 flex-col items-center justify-center p-2 text-slate-400">
+        <div className="min-w-0 flex flex-1 flex-col items-center justify-center overflow-hidden p-2 text-slate-400">
           <VisualAsset
             visualKey={node.visualKey ?? node.deviceType ?? "generic"}
             image={node.image}
+            fit={node.fit}
+            background={node.background}
+            className="h-20 w-24"
             alt={node.title}
-            fallback={<DeviceIllustration deviceType={node.deviceType ?? "generic"} />}
+            fallback={node.category
+              ? <ItemGlyph category={node.category} catalogId={node.visualKey ?? ""} color={node.color} size={42} />
+              : <DeviceIllustration deviceType={node.deviceType ?? "generic"} />}
           />
           {node.warningBadge && (
             <div className="mt-2 flex items-center gap-1 rounded bg-red-100 px-1.5 py-0.5 text-[8.5px] font-bold text-red-700">
@@ -884,7 +1095,7 @@ export const DeviceNodeCard = memo(function DeviceNodeCard({
         </div>
 
         {/* Colonne OUT (Droite) */}
-        <div className="flex flex-col items-end text-[10px]">
+        <div className="min-w-0 w-[34%] flex flex-col items-end text-[10px]">
           {portsOut.length > 0 && (
             <span className="flex h-4 items-center text-[8px] font-bold uppercase tracking-wider text-slate-400">OUT</span>
           )}
@@ -896,10 +1107,10 @@ export const DeviceNodeCard = memo(function DeviceNodeCard({
                 data-synoptic-node={node.id}
                 data-synoptic-port={port.id}
                 onPointerDown={(e) => onStartLinking(node, port, e)}
-                className="port-handle flex h-6 items-center gap-1.5 cursor-pointer rounded px-1 hover:bg-slate-100 transition"
+                className="port-handle flex h-6 min-w-0 max-w-full items-center justify-end gap-1.5 cursor-pointer rounded px-1 hover:bg-slate-100 transition"
                 title={`Sortie ${port.name} (${cableCfg.label}) - Glisser pour relier`}
               >
-                <span className="whitespace-nowrap font-semibold text-slate-700">{port.name}</span>
+                <span className="min-w-0 truncate text-right font-semibold text-slate-700">{port.name} <span className="font-mono text-[8px] text-slate-400">({cableCfg.label})</span></span>
                 <div
                   className="h-3 w-3 rounded-full border border-slate-600 flex items-center justify-center bg-white shadow-xs"
                   style={{ borderColor: cableCfg.color }}

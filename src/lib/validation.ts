@@ -2,7 +2,7 @@ import type { SynopticNode, SynopticLink, CableType } from "./types";
 
 export type ValidationError = {
   nodeId: string;
-  type: "missing_power" | "unconnected_port" | "mismatched_cable";
+  type: "unconnected_port" | "mismatched_cable";
   message: string;
   severity: "error" | "warning";
 };
@@ -21,29 +21,7 @@ export function validateSynoptic(nodes: SynopticNode[], links: SynopticLink[]): 
   });
 
   nodes.forEach((node) => {
-    // 1. Power Validation
-    if (node.needsPower) {
-      const hasPowerLink = links.some((link) =>
-        (link.toNodeId === node.id && link.cableType === "usb") || // Simplified: assume USB or specific power cables
-        (link.fromNodeId === node.id && link.cableType === "usb")
-      );
-
-      // In a real scenario, we might check if there's a node of type 'power_supply'
-      // For now, we'll flag it if it doesn't have at least one connection that could be power
-      // or if we want a more explicit 'power' cable type.
-      // Let's assume for the prototype that if it needs power, it needs a link to a power source.
-      // Since we don't have a dedicated power source node yet, let's check if it's linked at all.
-      if (!hasPowerLink) {
-        errors.push({
-          nodeId: node.id,
-          type: "missing_power",
-          message: "L'appareil nécessite une alimentation secteur",
-          severity: "error",
-        });
-      }
-    }
-
-    // 2. Port Validation
+    // Port Validation
     // Check for critical inputs that are empty
     if (node.deviceType === "mixer" || node.deviceType === "recorder") {
       const criticalPorts = node.portsIn.filter(p => {

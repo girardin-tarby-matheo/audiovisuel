@@ -1,43 +1,46 @@
-# Astro Starter Kit: Minimal
+# Shotboard Studio
 
-```sh
-npm create astro@latest -- --template minimal
+Shotboard Studio est un outil de planification de tournage et de conception de synoptique pour équipes de production, avec un plateau visuel, une bibliothèque d'objets modulables et un mode synoptique de câblage.
+
+## Fonctionnalités principales
+
+- Plateau de plan de tournage avec objets, calques, zoom et déplacement
+- Bibliothèque de filtres, éléments personnalisés et ports connectiques
+- Mode synoptique pour relier caméra, audio, mixage et écrans
+- Export PNG et partage de projet via URL
+- Gestion de projets en local et import / export JSON
+
+## Démarrage rapide
+
+```bash
+npm install
+npm run dev -- --host 0.0.0.0 --port 4321
 ```
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+## Scripts utiles
 
-## 🚀 Project Structure
+```bash
+npm run dev
+npm run build
+npm run preview -- --host 0.0.0.0 --port 4321
+```
 
-Inside of your Astro project, you'll see the following folders and files:
+## Structure du projet
 
 ```text
-/
-├── public/
-├── src/
-│   └── pages/
-│       └── index.astro
-└── package.json
+src/
+  components/     Composants React UI
+  lib/           catalogues, utilitaires et types
+  pages/          routes Astro
+  store/          store Zustand du studio
 ```
 
-Astro looks for `.astro` or `.md` files in the `src/pages/` directory. Each page is exposed as a route based on its file name.
+## Bonnes pratiques
 
-There's nothing special about `src/components/`, but that's where we like to put any Astro/React/Vue/Svelte/Preact components.
+- Conserver les objets personnalisés dans le catalogue pour réutiliser la configuration
+- Utiliser le mode synoptique pour vérifier les connexions avant le tournage
+- Exporter le fichier JSON avant les grandes itérations de conception
 
-Any static assets, like images, can be placed in the `public/` directory.
+## Développement
 
-## 🧞 Commands
-
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+Le projet est construit avec Astro + React + Zustand + Tailwind.

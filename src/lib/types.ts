@@ -113,6 +113,8 @@ export type SynopticNode = {
   color: string;
   visualKey?: string;
   image?: string;
+  fit?: "contain" | "cover" | "fill";
+  background?: string;
   x: number;
   y: number;
   width?: number;

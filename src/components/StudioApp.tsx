@@ -109,13 +109,21 @@ export default function StudioApp() {
   const [showProjects, setShowProjects] = useState(false);
 
   useEffect(() => {
-    const seen = localStorage.getItem("shotboard-welcome-seen");
-    if (!seen) setShowWelcome(true);
+    try {
+      const seen = window.localStorage.getItem("shotboard-welcome-seen");
+      if (!seen) setShowWelcome(true);
+    } catch {
+      setShowWelcome(true);
+    }
   }, []);
 
   const dismissWelcome = useCallback(() => {
     setShowWelcome(false);
-    localStorage.setItem("shotboard-welcome-seen", "1");
+    try {
+      window.localStorage.setItem("shotboard-welcome-seen", "1");
+    } catch {
+      // Ignore quota/storage errors in restricted contexts.
+    }
   }, []);
 
   return (
@@ -129,10 +137,7 @@ export default function StudioApp() {
             <PropertiesPanel />
           </>
         ) : (
-          <>
-            <Sidebar />
-            <SynopticBoard />
-          </>
+          <SynopticBoard />
         )}
       </div>
       <CatalogManagerModal />
