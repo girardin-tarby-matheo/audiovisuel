@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import type { DragEvent, PointerEvent as ReactPointerEvent } from "react";
 import { BoardNode } from "./BoardNode";
+import { computeLabelPlacements } from "../lib/labelLayout";
 import { BottomToolbar } from "./Sidebar";
 import { screenToWorld, useStudio } from "../store/studioStore";
 import type { CameraView } from "../lib/types";
@@ -293,6 +294,36 @@ export function CanvasBoard() {
     setIsDragOver(false);
   }, []);
 
+  const visibleItems = useMemo(() => items.filter((item) => {
+    const layer = item.category === "light" || (item.layer as string) === "power" ? "lights" : (item.layer as string) === "data" ? "accessories" : item.layer ?? (item.category === "audio" ? "audio" : item.category === "camera" ? "video" : "accessories");
+    return visibleLayers?.[layer] ?? true;
+  }), [items, visibleLayers]);
+  const placements = useMemo(() => computeLabelPlacements(visibleItems), [visibleItems]);
+  const labelLayer = visibleItems.map((item) => {
+    const place = placements.get(item.id);
+    if (!place) return null;
+    const selected = selectedIds.includes(item.id);
+    return (
+      <div
+        key={`label-${item.id}`}
+        className="pointer-events-none absolute text-center"
+        style={{ left: place.x, top: place.y, width: place.width, transform: "translate(-50%, -50%)", zIndex: selected ? 40 : 15 }}
+      >
+        <p
+          className={`item-label mx-auto truncate rounded-full border px-2.5 py-[3px] text-[11px] font-semibold leading-tight backdrop-blur-sm transition-colors ${selected ? "border-amber-300/50 bg-surface/90 text-amber-100" : "border-white/10 bg-surface/70 text-slate-100"}`}
+          style={{ width: "fit-content", maxWidth: "100%" }}
+        >
+          {item.name}
+        </p>
+        {selected && item.notes && (
+          <p className="item-label mx-auto mt-1 w-max max-w-[220px] rounded-md bg-surface/85 px-2 py-0.5 text-[9.5px] leading-snug text-slate-300 backdrop-blur-sm">
+            {item.notes}
+          </p>
+        )}
+      </div>
+    );
+  });
+
   return (
     <section className="relative min-w-0 flex-1 overflow-hidden">
       <div
@@ -320,10 +351,8 @@ export function CanvasBoard() {
             height: 4000,
           }}
         >
-          {items.filter((item) => {
-            const layer = item.category === "light" || (item.layer as string) === "power" ? "lights" : (item.layer as string) === "data" ? "accessories" : item.layer ?? (item.category === "audio" ? "audio" : item.category === "camera" ? "video" : "accessories");
-            return visibleLayers?.[layer] ?? true;
-          }).map((item) => (
+          {labelLayer}
+          {visibleItems.map((item) => (
             <BoardNode
               key={item.id}
               item={item}

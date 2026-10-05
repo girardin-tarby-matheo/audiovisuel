@@ -427,27 +427,6 @@ export const BoardNode = memo(function BoardNode({ item, selected, selectedItems
           </button>
         )}
       </div>
-
-      {/* ── Label below card ── */}
-      <div
-        className="pointer-events-none absolute left-1/2 top-[calc(100%+6px)] w-40 -translate-x-1/2 text-center"
-        style={{ transform: `translateX(-50%) rotate(${-item.rotation}deg)` }}
-      >
-        <p
-          className="item-label truncate text-[11px] font-semibold tracking-wide text-slate-100/90"
-          style={{ textShadow: "0 1px 4px rgb(0 0 0 / 0.6), 0 0 12px rgb(0 0 0 / 0.4)" }}
-        >
-          {item.name}
-        </p>
-        {item.notes && (
-          <p
-            className="item-label mt-0.5 truncate text-[9px] text-slate-400/70"
-            style={{ textShadow: "0 1px 3px rgb(0 0 0 / 0.5)" }}
-          >
-            {item.notes}
-          </p>
-        )}
-      </div>
     </div>
   );
 }
