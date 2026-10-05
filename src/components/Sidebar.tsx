@@ -123,7 +123,6 @@ export function Sidebar() {
             })}
           </div>
         </div>
-        <BackgroundPanel />
         {CATEGORIES.map((category) => {
           const catItems = filtered.filter((item) => item.category === category.id);
           if (catItems.length === 0) return null;
@@ -182,6 +181,7 @@ export function Sidebar() {
         {filtered.length === 0 && (
           <p className="py-8 text-center text-xs text-slate-500">Aucun élément trouvé pour « {search} »</p>
         )}
+        <BackgroundPanel />
       </div>
 
       {selectedId && (
