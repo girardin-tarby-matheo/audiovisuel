@@ -516,6 +516,7 @@ export const useStudio = create<StudioState>()(
         const camTemplate = SYNOPTIC_TEMPLATES["generic-camera"];
         planCameras.forEach((cam, i) => {
           const nodeId = uid();
+          const catalogItem = state.catalog.find((item) => item.id === cam.catalogId);
           nodes.push({
             id: nodeId,
             sourceId: cam.id,
@@ -523,11 +524,11 @@ export const useStudio = create<StudioState>()(
             subtitle: cam.label || "Sortie HDMI / SDI",
             category: cam.category,
             deviceType: camTemplate.deviceType,
-            color: cam.color || camTemplate.color,
-            image: cam.image,
-            fit: cam.fit,
-            background: cam.background,
-            visualKey: cam.visualKey ?? cam.catalogId,
+            color: cam.color || catalogItem?.color || camTemplate.color,
+            image: cam.image ?? catalogItem?.image,
+            fit: cam.fit ?? catalogItem?.fit,
+            background: cam.background ?? catalogItem?.background,
+            visualKey: cam.visualKey ?? catalogItem?.visualKey ?? cam.catalogId,
             x: 160,
             y: 180 + i * 115,
             portsIn: [],
@@ -553,6 +554,7 @@ export const useStudio = create<StudioState>()(
         const micTemplate = SYNOPTIC_TEMPLATES["generic-mic"];
         planAudios.slice(0, 4).forEach((mic, i) => {
           const nodeId = uid();
+          const catalogItem = state.catalog.find((item) => item.id === mic.catalogId);
           nodes.push({
             id: nodeId,
             sourceId: mic.id,
@@ -560,11 +562,11 @@ export const useStudio = create<StudioState>()(
             subtitle: mic.label || "XLR",
             category: mic.category,
             deviceType: micTemplate.deviceType,
-            color: mic.color || micTemplate.color,
-            image: mic.image,
-            fit: mic.fit,
-            background: mic.background,
-            visualKey: mic.visualKey ?? mic.catalogId,
+            color: mic.color || catalogItem?.color || micTemplate.color,
+            image: mic.image ?? catalogItem?.image,
+            fit: mic.fit ?? catalogItem?.fit,
+            background: mic.background ?? catalogItem?.background,
+            visualKey: mic.visualKey ?? catalogItem?.visualKey ?? mic.catalogId,
             x: 160,
             y: 670 + i * 95,
             portsIn: [],
@@ -632,6 +634,21 @@ export const useStudio = create<StudioState>()(
             });
           }
         });
+
+        const hyperDeckNode = nodes.find((node) => node.id === hyperDeckNodeId);
+        const masterScreenNode = nodes.find((node) => node.title === SYNOPTIC_TEMPLATES["master-screen"].title);
+        const hyperDeckOutput = hyperDeckNode?.portsOut.find((port) => port.id === "hdmi-out");
+        const masterScreenInput = masterScreenNode?.portsIn.find((port) => port.id === "hdmi-in");
+        if (hyperDeckNode && masterScreenNode && hyperDeckOutput && masterScreenInput && !links.some((link) => link.fromNodeId === hyperDeckNode.id && link.toNodeId === masterScreenNode.id)) {
+          links.push({
+            id: uid(),
+            fromNodeId: hyperDeckNode.id,
+            fromPortId: hyperDeckOutput.id,
+            toNodeId: masterScreenNode.id,
+            toPortId: masterScreenInput.id,
+            cableType: "hdmi",
+          });
+        }
 
         set({
           synopticNodes: nodes,

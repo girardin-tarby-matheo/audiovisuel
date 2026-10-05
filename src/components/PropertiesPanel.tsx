@@ -25,7 +25,7 @@ export function PropertiesPanel() {
 
   if (!item) {
     return (
-      <aside className="flex w-[300px] shrink-0 flex-col border-l border-white/6 bg-[#0c0e14]">
+      <aside className="flex w-[300px] shrink-0 flex-col border-l border-white/6 bg-chrome">
         <div className="border-b border-white/6 px-4 py-4">
           <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-violet-200/70">Propriétés</p>
           <h2 className="mt-1 text-sm font-semibold text-white">Aucun élément</h2>
@@ -46,7 +46,7 @@ export function PropertiesPanel() {
   }
 
   return (
-    <aside className="flex w-[300px] shrink-0 flex-col border-l border-white/6 bg-[#0c0e14]">
+    <aside className="flex w-[300px] shrink-0 flex-col border-l border-white/6 bg-chrome">
       {/* Header with preview */}
       <div className="border-b border-white/6 px-4 py-4">
         <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-violet-200/70">Propriétés</p>

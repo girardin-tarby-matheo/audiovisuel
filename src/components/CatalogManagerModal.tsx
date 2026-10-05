@@ -239,11 +239,11 @@ export function CatalogManagerModal() {
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/75 backdrop-blur-md animate-fade-in p-4">
       <div
-        className="flex h-[90vh] max-h-[860px] w-full max-w-5xl flex-col rounded-3xl border border-white/10 bg-[#0e1118] shadow-2xl overflow-hidden"
+        className="flex h-[90vh] max-h-[860px] w-full max-w-5xl flex-col rounded-3xl border border-white/10 bg-surface shadow-2xl overflow-hidden"
         style={{ animation: "modal-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both" }}
       >
         {/* Header */}
-        <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/8 px-6 bg-[#121620]">
+        <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/8 px-6 bg-surface">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400/20 to-violet-400/20 text-amber-300">
               <Sparkles size={20} />
@@ -278,7 +278,7 @@ export function CatalogManagerModal() {
         {/* Content body : Left list / Right editor */}
         <div className="flex min-h-0 flex-1">
           {/* Left Column : Catalog items list */}
-          <div className="flex w-[320px] shrink-0 flex-col border-r border-white/8 bg-[#0b0d13]">
+          <div className="flex w-[320px] shrink-0 flex-col border-r border-white/8 bg-sunken">
             {/* Search & Category filter */}
             <div className="border-b border-white/6 p-3 space-y-2.5">
               <div className="relative">
@@ -396,7 +396,7 @@ export function CatalogManagerModal() {
             </div>
 
             {/* Footer reset button */}
-            <div className="border-t border-white/6 p-3 bg-[#0a0c10]">
+            <div className="border-t border-white/6 p-3 bg-sunken">
               <button
                 type="button"
                 onClick={() => {
@@ -520,7 +520,7 @@ export function CatalogManagerModal() {
                         className="field text-xs"
                       >
                         {CATEGORIES.map((cat) => (
-                          <option key={cat.id} value={cat.id} className="bg-[#121620] text-white">
+                          <option key={cat.id} value={cat.id} className="bg-surface text-white">
                             {cat.label}
                           </option>
                         ))}
@@ -628,10 +628,10 @@ export function CatalogManagerModal() {
                           onChange={(e) => setFormState({ ...formState, fit: e.target.value as any })}
                           className="field text-xs py-1"
                         >
-                          <option value="contain" className="bg-[#121620]">
+                          <option value="contain" className="bg-surface">
                             Contenir (Entier)
                           </option>
-                          <option value="cover" className="bg-[#121620]">
+                          <option value="cover" className="bg-surface">
                             Remplir (Cover)
                           </option>
                         </select>
@@ -688,7 +688,7 @@ export function CatalogManagerModal() {
                         className="field min-w-0 flex-1 text-xs py-1 lg:w-56 lg:flex-none"
                       >
                         {DEVICE_TYPES.map((dt) => (
-                          <option key={dt.id} value={dt.id} className="bg-[#121620]">
+                          <option key={dt.id} value={dt.id} className="bg-surface">
                             {dt.label}
                           </option>
                         ))}
@@ -773,7 +773,7 @@ export function CatalogManagerModal() {
                               className="field min-w-0 w-full text-[11px] py-1"
                             >
                               {CABLE_TYPES.map((ct) => (
-                                <option key={ct.id} value={ct.id} className="bg-[#121620]">
+                                <option key={ct.id} value={ct.id} className="bg-surface">
                                   {ct.label}
                                 </option>
                               ))}
@@ -879,7 +879,7 @@ export function CatalogManagerModal() {
                               className="field min-w-0 w-full text-[11px] py-1"
                             >
                               {CABLE_TYPES.map((ct) => (
-                                <option key={ct.id} value={ct.id} className="bg-[#121620]">
+                                <option key={ct.id} value={ct.id} className="bg-surface">
                                   {ct.label}
                                 </option>
                               ))}

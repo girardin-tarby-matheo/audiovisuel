@@ -10,7 +10,7 @@ export function ValidationPanel({ onClose }: { onClose: () => void }) {
     const nodeNames = new Map(nodes.map((node) => [node.id, node.title]));
 
     return (
-        <aside className="no-export absolute right-4 top-4 z-40 w-[min(360px,calc(100vw-2rem))] rounded-2xl border border-white/10 bg-[#10141c]/95 p-4 shadow-2xl backdrop-blur-md">
+        <aside className="no-export absolute right-4 top-4 z-40 w-[min(360px,calc(100vw-2rem))] rounded-2xl border border-white/10 bg-surface/95 p-4 shadow-2xl backdrop-blur-md">
             <div className="flex items-start justify-between gap-3">
                 <div>
                     <p className="text-[10px] uppercase tracking-[0.18em] text-amber-200/70">Contrôle technique</p>

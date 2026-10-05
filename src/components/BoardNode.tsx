@@ -182,7 +182,7 @@ export const BoardNode = memo(function BoardNode({ item, selected, selectedItems
               if (event.key === "ArrowLeft" || event.key === "ArrowDown") onUpdate(item.id, { rotation: Math.max(-180, item.rotation - (event.shiftKey ? 15 : 1)) });
               if (event.key === "ArrowRight" || event.key === "ArrowUp") onUpdate(item.id, { rotation: Math.min(180, item.rotation + (event.shiftKey ? 15 : 1)) });
             }}
-            className="control-handle control-handle-rotation absolute left-[calc(100%+22px)] top-1/2 z-30 flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-amber-200/80 bg-[#17151a] text-[10px] text-amber-200 shadow-lg"
+            className="control-handle control-handle-rotation absolute left-[calc(100%+22px)] top-1/2 z-30 flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-amber-200/80 bg-surface text-[10px] text-amber-200 shadow-lg"
             title="Faire pivoter"
           >
             ↻
@@ -204,7 +204,7 @@ export const BoardNode = memo(function BoardNode({ item, selected, selectedItems
                 if (event.key === "ArrowDown") onUpdate(item.id, { height: Math.min(800, height + step) });
                 if (event.key === "ArrowUp") onUpdate(item.id, { height: Math.max(40, height - step) });
               }}
-              className="control-handle control-handle-resize absolute -bottom-2 -right-2 z-30 h-5 w-5 rounded-sm border border-violet-200/80 bg-[#17151a] shadow-lg"
+              className="control-handle control-handle-resize absolute -bottom-2 -right-2 z-30 h-5 w-5 rounded-sm border border-[#ddd6fe]/80 bg-surface shadow-lg"
               title="Redimensionner"
             >
               <span className="pointer-events-none absolute bottom-0.5 right-0.5 h-2.5 w-2.5 border-b-2 border-r-2 border-violet-200" />
@@ -227,7 +227,7 @@ export const BoardNode = memo(function BoardNode({ item, selected, selectedItems
                 if (event.key === "ArrowLeft" || event.key === "ArrowDown") onUpdate(item.id, { fov: Math.max(18, item.fov - (event.shiftKey ? 10 : 1)) });
                 if (event.key === "ArrowRight" || event.key === "ArrowUp") onUpdate(item.id, { fov: Math.min(120, item.fov + (event.shiftKey ? 10 : 1)) });
               }}
-              className="control-handle control-handle-camera absolute z-30 flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-cyan-200/80 bg-[#11191b] text-[10px] text-cyan-200 shadow-lg"
+              className="control-handle control-handle-camera absolute z-30 flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-cyan-200/80 bg-surface text-[10px] text-cyan-200 shadow-lg"
               style={{
                 left: `calc(50% + ${Math.sin(halfFov) * coneRange}px)`,
                 top: `calc(50% - ${Math.cos(halfFov) * coneRange}px)`,
@@ -254,7 +254,7 @@ export const BoardNode = memo(function BoardNode({ item, selected, selectedItems
                   if (event.key === "ArrowLeft") onUpdate(item.id, { beamSpread: Math.max(12, item.beamSpread - (event.shiftKey ? 10 : 1)) });
                   if (event.key === "ArrowRight") onUpdate(item.id, { beamSpread: Math.min(180, item.beamSpread + (event.shiftKey ? 10 : 1)) });
                 }}
-                className="control-handle control-handle-beam absolute z-30 flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-amber-200/80 bg-[#17151a] text-[10px] text-amber-200 shadow-lg"
+                className="control-handle control-handle-beam absolute z-30 flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-amber-200/80 bg-surface text-[10px] text-amber-200 shadow-lg"
                 style={{
                   left: `calc(50% + ${Math.sin(halfBeam) * beamRange}px)`,
                   top: `calc(50% - ${Math.cos(halfBeam) * beamRange}px)`,
@@ -363,12 +363,16 @@ export const BoardNode = memo(function BoardNode({ item, selected, selectedItems
           ? "rounded-xl backdrop-blur-sm"
           : "node-marker rounded-full"
           } ${selected
-            ? "border-amber-300/70 bg-[#10141c]/92 shadow-[0_0_0_1px_rgba(245,185,66,0.3),0_12px_40px_rgba(0,0,0,0.35)]"
+            ? "border-amber-300/70 bg-surface/92 shadow-[0_0_0_1px_rgba(245,185,66,0.3),0_12px_40px_rgba(0,0,0,0.35)]"
             : item.category === "set"
-              ? "border-white/10 bg-[#10141c]/88 hover:border-white/20 hover:bg-[#10141c]/95"
-              : "border-white/15 bg-[#10141c]/80 hover:border-white/35 hover:bg-[#10141c]/95"
+              ? "border-white/10 bg-surface/88 hover:border-white/20 hover:bg-surface/95"
+              : "border-white/15 bg-surface/80 hover:border-white/35 hover:bg-surface/95"
           } ${panActive ? "cursor-grab" : "cursor-grab active:cursor-grabbing"}`}
         style={{
+          ...(item.category !== "set" ? {
+            background: `radial-gradient(circle at 30% 25%, ${item.color}38, var(--color-surface) 72%)`,
+            borderColor: selected ? "rgb(252 211 77 / 0.75)" : `${item.color}77`,
+          } : {}),
           boxShadow: item.category === "light"
             ? `0 0 ${selected ? 32 : 22}px ${item.color}${selected ? "66" : "44"}, 0 8px 20px rgb(0 0 0 / 0.25)`
             : selected
@@ -392,8 +396,8 @@ export const BoardNode = memo(function BoardNode({ item, selected, selectedItems
           fit={item.fit}
           background={item.background}
           alt={item.name}
-          className={item.category === "camera" && item.catalogId !== "cam-drone" ? "-rotate-90" : undefined}
-          fallback={<ItemGlyph category={item.category} catalogId={item.catalogId} color={item.color} size={item.category === "set" ? 28 : 22} />}
+          className={item.catalogId === "cam-main" || item.catalogId === "cam-b" ? "-rotate-90" : undefined}
+          fallback={<ItemGlyph category={item.category} catalogId={item.catalogId} color={item.color} size={item.category === "set" ? 30 : 26} />}
         />
         {item.category === "set" && (
           <span className="mt-1 font-mono text-[9px] tracking-[0.18em] text-white/70">{item.label}</span>
@@ -411,7 +415,7 @@ export const BoardNode = memo(function BoardNode({ item, selected, selectedItems
         {selected && (
           <button
             type="button"
-            className="absolute -right-2.5 -top-2.5 flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-[#1a1020]/95 text-[12px] text-rose-300 shadow-lg no-export transition-all hover:scale-110 hover:bg-rose-500/30 hover:text-rose-200"
+            className="absolute -right-2.5 -top-2.5 flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-surface/95 text-[12px] text-rose-300 shadow-lg no-export transition-all hover:scale-110 hover:bg-rose-500/30 hover:text-rose-200"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
@@ -430,14 +434,14 @@ export const BoardNode = memo(function BoardNode({ item, selected, selectedItems
         style={{ transform: `translateX(-50%) rotate(${-item.rotation}deg)` }}
       >
         <p
-          className="truncate text-[11px] font-semibold tracking-wide text-slate-100/90"
+          className="item-label truncate text-[11px] font-semibold tracking-wide text-slate-100/90"
           style={{ textShadow: "0 1px 4px rgb(0 0 0 / 0.6), 0 0 12px rgb(0 0 0 / 0.4)" }}
         >
           {item.name}
         </p>
         {item.notes && (
           <p
-            className="mt-0.5 truncate text-[9px] text-slate-400/70"
+            className="item-label mt-0.5 truncate text-[9px] text-slate-400/70"
             style={{ textShadow: "0 1px 3px rgb(0 0 0 / 0.5)" }}
           >
             {item.notes}

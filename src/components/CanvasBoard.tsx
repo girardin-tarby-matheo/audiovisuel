@@ -46,7 +46,7 @@ function Minimap() {
 
   return (
     <div
-      className="minimap no-export pointer-events-auto absolute bottom-20 right-4 z-20 bg-[#0c0e14]/85"
+      className="minimap no-export pointer-events-auto absolute bottom-20 right-4 z-20 bg-chrome/85"
       style={{ width: w + 8, height: h + 8, padding: 4 }}
     >
       <svg width={w} height={h} className="block">

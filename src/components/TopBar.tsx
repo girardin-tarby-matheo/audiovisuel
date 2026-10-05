@@ -1,7 +1,8 @@
-import { useState, useCallback } from "react";
-import { Download, Share2, Clapperboard, RotateCcw, Loader2, Check, LayoutDashboard, Network, FolderOpen } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { Download, Share2, Clapperboard, RotateCcw, Loader2, Check, LayoutDashboard, Network, FolderOpen, Undo2, Redo2, Sun, Moon } from "lucide-react";
 import { toPng } from "html-to-image";
 import { useStudio } from "../store/studioStore";
+import { useHistory, undo, redo } from "../store/history";
 
 type ActionState = "idle" | "busy" | "done";
 
@@ -17,6 +18,18 @@ export function TopBar({ onOpenProjects }: { onOpenProjects: () => void }) {
   const resetBoard = useStudio((s) => s.resetBoard);
   const exportProject = useStudio((s) => s.exportProject);
 
+  const canUndo = useHistory((s) => s.canUndo);
+  const canRedo = useHistory((s) => s.canRedo);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  useEffect(() => {
+    if (document.documentElement.dataset.theme === "light") setTheme("light");
+  }, []);
+  const toggleTheme = useCallback(() => {
+    const next = theme === "light" ? "dark" : "light";
+    document.documentElement.dataset.theme = next;
+    try { window.localStorage.setItem("shotboard-theme", next); } catch { /* stockage indisponible */ }
+    setTheme(next);
+  }, [theme]);
   const [shareState, setShareState] = useState<ActionState>("idle");
   const [exportState, setExportState] = useState<ActionState>("idle");
   const totalPower = items.reduce((total, item) => total + (item.specs?.powerWatts ?? 0), 0);
@@ -56,7 +69,7 @@ export function TopBar({ onOpenProjects }: { onOpenProjects: () => void }) {
       const dataUrl = await toPng(node, {
         cacheBust: true,
         pixelRatio: 3,
-        backgroundColor: viewMode === "synoptic" ? "#ffffff" : "#0b0e15",
+        backgroundColor: getComputedStyle(document.documentElement).getPropertyValue("--color-canvas").trim() || "#0b0e15",
         filter: (element) => !(element instanceof HTMLElement && element.classList.contains("no-export")),
       });
       const link = document.createElement("a");
@@ -77,7 +90,7 @@ export function TopBar({ onOpenProjects }: { onOpenProjects: () => void }) {
   }, [exportState, title, viewMode, setToast]);
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/6 bg-[#0c0e14]/95 px-4">
+    <header className="flex h-14 shrink-0 items-center justify-between gap-2 whitespace-nowrap border-b border-white/6 bg-chrome/95 px-4">
       <div className="flex min-w-0 items-center gap-3">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-amber-300/20 to-cyan-300/10 text-amber-200 transition-transform hover:scale-105">
           <Clapperboard size={18} />
@@ -87,7 +100,7 @@ export function TopBar({ onOpenProjects }: { onOpenProjects: () => void }) {
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-[min(420px,42vw)] truncate bg-transparent text-[15px] font-semibold text-white outline-none transition-colors focus:text-amber-100"
+            className="w-[min(420px,30vw)] truncate bg-transparent text-[15px] font-semibold text-white outline-none transition-colors focus:text-amber-100"
           />
         </div>
       </div>
@@ -111,6 +124,25 @@ export function TopBar({ onOpenProjects }: { onOpenProjects: () => void }) {
             <Network size={13} /> Synoptique
           </button>
         </div>
+
+        <div className="flex rounded-xl border border-white/8 p-0.5">
+          <button type="button" onClick={undo} disabled={!canUndo} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/8 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent" title="Annuler (Ctrl+Z)" aria-label="Annuler">
+            <Undo2 size={15} />
+          </button>
+          <button type="button" onClick={redo} disabled={!canRedo} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/8 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent" title="Rétablir (Ctrl+Y)" aria-label="Rétablir">
+            <Redo2 size={15} />
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="rounded-xl border border-white/8 p-2 text-slate-400 transition hover:bg-white/8 hover:text-white"
+          title={theme === "light" ? "Passer en thème sombre" : "Passer en thème clair"}
+          aria-label={theme === "light" ? "Passer en thème sombre" : "Passer en thème clair"}
+        >
+          {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
+        </button>
 
         <button
           type="button"
@@ -160,7 +192,7 @@ export function TopBar({ onOpenProjects }: { onOpenProjects: () => void }) {
           ) : (
             <Share2 size={15} />
           )}
-          {shareState === "done" ? "Copié !" : "Partager"}
+          <span className="hidden xl:inline">{shareState === "done" ? "Copié !" : "Partager"}</span>
         </button>
 
         <button
@@ -171,7 +203,7 @@ export function TopBar({ onOpenProjects }: { onOpenProjects: () => void }) {
             ? "bg-emerald-400/90 text-ink-950"
             : exportState === "busy"
               ? "bg-amber-300/60 text-ink-950"
-              : "bg-amber-300/90 text-ink-950 hover:bg-amber-200 hover:shadow-lg hover:shadow-amber-300/20"
+              : "bg-amber-300/90 text-ink-950 hover:bg-[#fde68a] hover:shadow-lg hover:shadow-amber-300/20"
             }`}
         >
           {exportState === "busy" ? (
@@ -181,7 +213,7 @@ export function TopBar({ onOpenProjects }: { onOpenProjects: () => void }) {
           ) : (
             <Download size={15} />
           )}
-          {exportState === "done" ? "Téléchargé !" : "Export PNG"}
+          <span className="hidden lg:inline">{exportState === "done" ? "Téléchargé !" : "Export PNG"}</span>
         </button>
       </div>
     </header>

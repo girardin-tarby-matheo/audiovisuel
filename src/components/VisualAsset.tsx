@@ -21,7 +21,7 @@ export function VisualAsset({ visualKey, image, fit, background, fallback, class
       <span
         className={`visual-asset ${className}`}
         style={{
-          background: background ?? visual.background ?? "#e2e8f0",
+          background: background ?? visual.background ?? "transparent",
           borderRadius: visual.radius ?? "0.5rem",
         }}
         aria-hidden={alt ? undefined : true}

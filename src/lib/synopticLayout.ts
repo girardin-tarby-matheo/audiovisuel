@@ -1,5 +1,13 @@
 import type { SynopticLink, SynopticNode } from "./types.ts";
 
+export function synopticNodeWidth(node: SynopticNode): number {
+    const minimum = node.deviceType === "mixer" ? 380 : node.deviceType === "audio" ? 340 : 300;
+    const portNames = [...(node.portsIn ?? []), ...(node.portsOut ?? [])].map((port) => port.name.length);
+    const longestPort = Math.max(...portNames, 10);
+    const sideWidth = Math.min(170, Math.max(120, longestPort * 6.2 + 34));
+    return Math.max(node.width ?? 0, minimum, 96 + sideWidth * 2 + 16);
+}
+
 export function computeSynopticAutoLayout(nodes: SynopticNode[], links: SynopticLink[]): SynopticNode[] {
     if (!nodes.length) return [];
 
@@ -38,8 +46,12 @@ export function computeSynopticAutoLayout(nodes: SynopticNode[], links: Synoptic
         if (!rank.has(node.id)) rank.set(node.id, 0);
     });
 
-    const nodeWidth = (node: SynopticNode) => node.width ?? (node.deviceType === "mixer" ? 280 : node.deviceType === "audio" ? 250 : 200);
-    const nodeHeight = (node: SynopticNode) => node.height ?? 150;
+    const nodeWidth = synopticNodeWidth;
+    const nodeHeight = (node: SynopticNode) => {
+        if (node.height) return node.height;
+        const portCount = Math.max(node.portsIn?.length ?? 0, node.portsOut?.length ?? 0, 1);
+        return Math.max(140, 61 + portCount * 32);
+    };
     const columns = new Map<number, SynopticNode[]>();
 
     nodes.forEach((node) => {

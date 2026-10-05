@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, memo, useMemo, type ChangeEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useState, useRef, useCallback, useEffect, useLayoutEffect, memo, useMemo, type ChangeEvent, type PointerEvent as ReactPointerEvent } from "react";
 import {
   RefreshCw,
   Plus,
@@ -27,6 +27,7 @@ import { CATEGORIES } from "../lib/catalog";
 import { ValidationPanel } from "./ValidationPanel";
 import { CABLE_COLORS } from "../lib/constants";
 import { validateSynoptic } from "../lib/validation";
+import { synopticNodeWidth } from "../lib/synopticLayout";
 import type { CableType, SynopticDeviceType, SynopticNode, SynopticPort } from "../lib/types";
 
 
@@ -65,7 +66,21 @@ const CABLE_TYPES: CableType[] = ["hdmi", "sdi", "xlr", "jack", "usb"];
 
 export function SynopticBoard() {
   const nodesMap = useStudio((state) => state.synopticNodes);
-  const nodes = useMemo(() => Object.values(nodesMap), [nodesMap]);
+  const catalog = useStudio((state) => state.catalog);
+  const boardItems = useStudio((state) => state.items);
+  const nodes = useMemo(() => Object.values(nodesMap).map((node) => {
+    const sourceItem = boardItems.find((item) => item.id === node.sourceId);
+    const catalogItem = catalog.find((item) => item.id === node.visualKey)
+      ?? (sourceItem ? catalog.find((item) => item.id === sourceItem.catalogId) : undefined);
+    if (!catalogItem) return node;
+    return {
+      ...node,
+      image: node.image || sourceItem?.image || catalogItem.image,
+      fit: node.fit || sourceItem?.fit || catalogItem.fit,
+      background: node.background || sourceItem?.background || catalogItem.background,
+      color: node.color || catalogItem.color,
+    };
+  }), [boardItems, catalog, nodesMap]);
   const links = useStudio((state) => state.synopticLinks);
   const generateSynoptic = useCallback(useStudio((state) => state.generateSynoptic), []);
   const addSynopticNode = useCallback(useStudio((state) => state.addSynopticNode), []);
@@ -110,6 +125,8 @@ export function SynopticBoard() {
   const [catalogSearch, setCatalogSearch] = useState("");
   const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
+  const [portCoordinates, setPortCoordinates] = useState<Map<string, { x: number; y: number }>>(new Map());
+  const repairedCanonicalLinksRef = useRef(false);
   const [marquee, setMarquee] = useState<{ startX: number; startY: number; x: number; y: number } | null>(null);
   const [showValidation, setShowValidation] = useState(false);
   const selectedLink = useMemo(() => links.find((link) => link.id === selectedLinkId) ?? null, [links, selectedLinkId]);
@@ -120,7 +137,6 @@ export function SynopticBoard() {
     links: links.length,
     issues: validationErrors.length,
   }), [nodes.length, links.length, validationErrors.length]);
-  const catalog = useStudio((state) => state.catalog);
   const filteredCatalog = useMemo(() => {
     const query = catalogSearch.trim().toLowerCase();
     if (!query) return catalog;
@@ -151,6 +167,22 @@ export function SynopticBoard() {
     document.addEventListener("pointerdown", closeOnOutsidePointer);
     return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
   }, [selectedLinkId]);
+
+  useEffect(() => {
+    if (repairedCanonicalLinksRef.current) return;
+    if (!nodes.length) return;
+    const hyperDeck = nodes.find((node) => node.sourceId === null && node.deviceType === "recorder" && node.title.startsWith("HyperDeck"));
+    const masterScreen = nodes.find((node) => node.sourceId === null && node.deviceType === "screen" && node.title === "Ecran Moniteur");
+    const hasHyperDeckLink = hyperDeck && masterScreen && links.some((link) => link.fromNodeId === hyperDeck.id && link.toNodeId === masterScreen.id);
+    if (hyperDeck && masterScreen && !hasHyperDeckLink) {
+      const fromPort = hyperDeck.portsOut.find((port) => port.id === "hdmi-out") ?? hyperDeck.portsOut.find((port) => port.type === "hdmi");
+      const toPort = masterScreen.portsIn.find((port) => port.id === "hdmi-in") ?? masterScreen.portsIn.find((port) => port.type === "hdmi");
+      if (fromPort && toPort) {
+        addSynopticLink(hyperDeck.id, masterScreen.id, fromPort.id, toPort.id, "hdmi");
+      }
+    }
+    repairedCanonicalLinksRef.current = true;
+  }, [addSynopticLink, links, nodes]);
 
   useEffect(() => {
     const closeAddMenu = (event: PointerEvent) => {
@@ -187,6 +219,31 @@ export function SynopticBoard() {
   const containerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const marqueeRef = useRef<MarqueeState | null>(null);
+
+  useLayoutEffect(() => {
+    const board = containerRef.current;
+    if (!board) return;
+    const boardRect = board.getBoundingClientRect();
+    const measured = new Map<string, { x: number; y: number }>();
+
+    nodes.forEach((node) => {
+      const width = synopticNodeWidth(node);
+      [...(node.portsIn ?? []).map((port) => ({ port, isOut: false })), ...(node.portsOut ?? []).map((port) => ({ port, isOut: true }))].forEach(({ port, isOut }) => {
+        const direction = isOut ? "out" : "in";
+        const element = document.querySelector<HTMLElement>(`[data-synoptic-node="${node.id}"][data-synoptic-port="${port.id}"][data-synoptic-direction="${direction}"]`);
+        if (!element) return;
+        const rect = element.getBoundingClientRect();
+        measured.set(`${node.id}:${direction}:${port.id}`, {
+          x: isOut ? node.x + width : node.x,
+          y: (rect.top + rect.height / 2 - boardRect.top - pan.y) / zoom,
+        });
+      });
+    });
+
+    setPortCoordinates(measured);
+  // Coordonnées en espace board : indépendantes du pan/zoom, inutile de re-mesurer à chaque déplacement.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -328,7 +385,7 @@ export function SynopticBoard() {
         const top = Math.min(activeMarquee.startY, endY);
         const bottom = Math.max(activeMarquee.startY, endY);
         const hits = nodes.filter((node) => {
-          const width = node.width || (node.deviceType === "mixer" ? 280 : node.deviceType === "audio" ? 250 : 200);
+          const width = synopticNodeWidth(node);
           const height = node.height || 100;
           const nodeLeft = pan.x + node.x * zoom;
           const nodeTop = pan.y + node.y * zoom;
@@ -421,11 +478,11 @@ export function SynopticBoard() {
 
   // Calcul des coordonnées d'un port
   const getPortCoordinates = useCallback(
-    (nodeId: string, portId?: string, isOut?: boolean) => {
+    (nodeId: string, portId?: string, isOut?: boolean, cableType?: CableType) => {
       const node = nodeMap.get(nodeId);
       if (!node) return null;
 
-      const width = node.width || (node.deviceType === "mixer" ? 280 : node.deviceType === "audio" ? 250 : 200);
+      const width = synopticNodeWidth(node);
 
       if (!portId) {
         return {
@@ -435,28 +492,22 @@ export function SynopticBoard() {
       }
 
       const ports = isOut ? (node.portsOut ?? []) : (node.portsIn ?? []);
-      const index = ports.findIndex((p) => p.id === portId);
-      const portElement = typeof document !== "undefined"
-        ? document.querySelector<HTMLElement>(`[data-synoptic-node="${nodeId}"][data-synoptic-port="${portId}"]`)
-        : null;
-      const boardRect = containerRef.current?.getBoundingClientRect();
-      if (portElement && boardRect) {
-        const portRect = portElement.getBoundingClientRect();
-        return {
-          x: isOut ? node.x + width : node.x,
-          y: (portRect.top + portRect.height / 2 - boardRect.top - pan.y) / zoom,
-        };
-      }
-      // Cartouche 52 px + contenu padding 8 px + en-tête 16 px.
-      // Chaque ligne de port mesure 24 px : le point tombe au centre du texte.
-      const portOffset = index >= 0 ? 76 + index * 24 : 60;
+      const requestedIndex = ports.findIndex((p) => p.id === portId);
+      const index = requestedIndex >= 0
+        ? requestedIndex
+        : ports.findIndex((port) => port.type === cableType);
+      const measured = portId ? portCoordinates.get(`${nodeId}:${isOut ? "out" : "in"}:${portId}`) : undefined;
+      if (measured) return measured;
+      // Cartouche 52 px + padding haut 8 px + titre de colonne 16 px.
+      // Chaque ligne de port occupe 32 px : le centre reste stable après un layout.
+      const portOffset = index >= 0 ? 76 + index * 32 : 60;
 
       return {
         x: isOut ? node.x + width : node.x,
         y: node.y + portOffset,
       };
     },
-    [nodeMap, pan, zoom]
+    [nodeMap, portCoordinates]
   );
 
   const addCatalogDevice = (catalogId: string) => {
@@ -499,7 +550,7 @@ export function SynopticBoard() {
     const viewportHeight = containerRef.current?.clientHeight ?? 800;
     const bounds = layoutNodes.reduce(
       (current, node) => {
-        const width = node.width || (node.deviceType === "mixer" ? 280 : node.deviceType === "audio" ? 250 : 200);
+        const width = synopticNodeWidth(node);
         const height = node.height || 150;
         return {
           minX: Math.min(current.minX, node.x),
@@ -522,28 +573,28 @@ export function SynopticBoard() {
 
 
   return (
-    <section className="relative min-w-0 flex-1 overflow-hidden select-none bg-[#f8fafc] text-slate-800">
+    <section className="relative min-w-0 flex-1 overflow-hidden select-none bg-canvas text-slate-100">
       {/* Barre d'outils supérieure */}
       <div className="synoptic-ui absolute left-4 top-3 z-30 flex flex-wrap items-center gap-2.5">
-        <div className="rounded-xl border border-slate-300 bg-white/95 px-3 py-1.5 shadow-md backdrop-blur">
+        <div className="rounded-xl border border-white/10 bg-ink-850/95 px-3 py-1.5 shadow-md backdrop-blur">
           <div className="flex items-center gap-2">
             <span className="h-2.5 w-2.5 rounded-full bg-violet-600 animate-pulse" />
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-800">Mode Synoptique</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-100">Mode Synoptique</p>
           </div>
-          <p className="text-[10px] text-slate-500">Câblage technique · {stats.devices} appareils · {stats.links} liaisons</p>
+          <p className="text-[10px] text-slate-400">Câblage technique · {stats.devices} appareils · {stats.links} liaisons</p>
         </div>
 
-        <div className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white/90 px-1.5 py-1 shadow-sm backdrop-blur">
+        <div className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-ink-850/90 px-1.5 py-1 shadow-sm backdrop-blur">
           <span className="rounded-lg bg-violet-100 px-2 py-1 text-[10px] font-semibold text-violet-700">{stats.devices}</span>
-          <span className="text-[10px] font-medium text-slate-500">Appareils</span>
-          <span className="mx-1 h-3 w-px bg-slate-200" />
+          <span className="text-[10px] font-medium text-slate-400">Appareils</span>
+          <span className="mx-1 h-3 w-px bg-white/10" />
           <span className="rounded-lg bg-cyan-100 px-2 py-1 text-[10px] font-semibold text-cyan-700">{stats.links}</span>
-          <span className="text-[10px] font-medium text-slate-500">Liens</span>
+          <span className="text-[10px] font-medium text-slate-400">Liens</span>
           {stats.issues > 0 && (
             <>
-              <span className="mx-1 h-3 w-px bg-slate-200" />
-              <span className="rounded-lg bg-amber-100 px-2 py-1 text-[10px] font-semibold text-amber-700">{stats.issues}</span>
-              <span className="text-[10px] font-medium text-slate-500">Alerte</span>
+              <span className="mx-1 h-3 w-px bg-white/10" />
+              <span className="rounded-lg bg-[#fef3c7] px-2 py-1 text-[10px] font-semibold text-amber-700">{stats.issues}</span>
+              <span className="text-[10px] font-medium text-slate-400">Alerte</span>
             </>
           )}
         </div>
@@ -551,7 +602,7 @@ export function SynopticBoard() {
         <button
           type="button"
           onClick={generateSynoptic}
-          className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 active:scale-95"
+          className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-ink-850 px-3 py-2 text-xs font-semibold text-slate-200 shadow-sm transition hover:bg-white/10 hover:text-white active:scale-95"
           title="Regénérer le synoptique à partir des caméras et équipements du plan"
         >
           <RefreshCw size={13} className="text-violet-600" />
@@ -569,7 +620,7 @@ export function SynopticBoard() {
           </button>
 
           {showAddMenu && (
-            <div className="absolute left-0 top-full z-40 mt-2 w-80 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl">
+            <div className="absolute left-0 top-full z-40 mt-2 w-80 rounded-2xl border border-white/8 bg-ink-850 p-2 shadow-2xl">
               <div className="relative mb-2">
                 <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
@@ -578,7 +629,7 @@ export function SynopticBoard() {
                   onPointerDown={(event) => event.stopPropagation()}
                   placeholder="Rechercher dans la bibliothèque..."
                   aria-label="Rechercher un équipement à ajouter"
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-8 pr-2 text-xs text-slate-700 outline-none focus:border-violet-400"
+                  className="w-full rounded-lg border border-white/8 bg-white/[0.04] py-2 pl-8 pr-2 text-xs text-slate-200 outline-none focus:border-violet-400"
                 />
               </div>
               <div className="max-h-[min(60vh,420px)] space-y-3 overflow-y-auto pr-1">
@@ -587,21 +638,21 @@ export function SynopticBoard() {
                   if (!categoryItems.length) return null;
                   return (
                     <section key={category.id}>
-                      <p className="px-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-600">{category.label}</p>
+                      <p className="px-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">{category.label}</p>
                       <div className="grid grid-cols-2 gap-1">
                         {categoryItems.map((item) => (
                           <button
                             key={item.id}
                             type="button"
                             onClick={() => addCatalogDevice(item.id)}
-                            className="flex min-w-0 items-center gap-2 rounded-lg px-2 py-2 text-left text-xs font-medium text-slate-700 hover:bg-violet-50 hover:text-violet-800"
+                            className="flex min-w-0 items-center gap-2 rounded-lg px-2 py-2 text-left text-xs font-medium text-slate-200 hover:bg-violet-400/10 hover:text-violet-200"
                             title={item.description}
                           >
-                            <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md bg-slate-100">
+                            <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white/[0.06]">
                               <VisualAsset
                                 visualKey={item.visualKey ?? item.id}
                                 image={item.image}
-                                fit={item.fit}
+                                fit="contain"
                                 background={item.background}
                                 className="h-7 w-7"
                                 alt=""
@@ -615,21 +666,21 @@ export function SynopticBoard() {
                     </section>
                   );
                 })}
-                {!filteredCatalog.length && <p className="px-2 py-5 text-center text-xs text-slate-500">Aucun équipement trouvé.</p>}
+                {!filteredCatalog.length && <p className="px-2 py-5 text-center text-xs text-slate-400">Aucun équipement trouvé.</p>}
               </div>
             </div>
           )}
         </div>
-        <button type="button" onClick={() => setShowValidation((open) => !open)} className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50" title="Afficher les erreurs techniques">
+        <button type="button" onClick={() => setShowValidation((open) => !open)} className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-ink-850 px-3 py-2 text-xs font-semibold text-slate-200 shadow-sm transition hover:bg-white/10" title="Afficher les erreurs techniques">
           <AlertTriangle size={13} className="text-amber-600" /> Validation
         </button>
-        <button type="button" onClick={autoLayoutAndFit} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50" title="Aligner automatiquement les équipements">Auto-layout</button>
-        {highlightedNodeIds.length > 0 && <button type="button" onClick={clearSignalTrace} className="rounded-xl border border-cyan-300 bg-cyan-50 px-3 py-2 text-xs font-semibold text-cyan-700 shadow-sm">Effacer le flux</button>}
+        <button type="button" onClick={autoLayoutAndFit} className="rounded-xl border border-white/10 bg-ink-850 px-3 py-2 text-xs font-semibold text-slate-200 shadow-sm transition hover:bg-white/10" title="Aligner automatiquement les équipements">Auto-layout</button>
+        {highlightedNodeIds.length > 0 && <button type="button" onClick={clearSignalTrace} className="rounded-xl border border-[#67e8f9] bg-cyan-50 px-3 py-2 text-xs font-semibold text-cyan-700 shadow-sm">Effacer le flux</button>}
       </div>
       {showValidation && <ValidationPanel onClose={() => setShowValidation(false)} />}
       {!isBoardEmpty && (selectedLink || selectedNodeCount > 0) && (
-        <div className="synoptic-ui absolute bottom-4 left-4 z-40 flex items-center gap-2 rounded-2xl border border-slate-300 bg-white/95 p-2 shadow-xl backdrop-blur">
-          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+        <div className="synoptic-ui absolute bottom-4 left-4 z-40 flex items-center gap-2 rounded-2xl border border-white/10 bg-ink-850/95 p-2 shadow-xl backdrop-blur">
+          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
             <span className="rounded-lg bg-violet-100 px-2 py-1 text-violet-700">{selectedLink ? "Lien" : `${selectedNodeCount} sel.`}</span>
             <span className="text-slate-400">{selectedLink ? "Câble sélectionné" : "Appareils sélectionnés"}</span>
           </div>
@@ -644,29 +695,29 @@ export function SynopticBoard() {
         </div>
       )}
       {selectedLink && (
-        <div className="link-editor-popup synoptic-ui absolute bottom-4 left-4 z-40 w-64 rounded-xl border border-slate-300 bg-white p-3 shadow-xl">
+        <div className="link-editor-popup synoptic-ui absolute bottom-4 left-4 z-40 w-64 rounded-xl border border-white/10 bg-ink-850 p-3 shadow-xl">
           <div className="mb-2 flex items-center justify-between">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Lien sélectionné</p>
-            <button type="button" onClick={() => setSelectedLinkId(null)} className="text-xs text-slate-400 hover:text-slate-700" aria-label="Fermer l’édition du lien">Fermer</button>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Lien sélectionné</p>
+            <button type="button" onClick={() => setSelectedLinkId(null)} className="text-xs text-slate-400 hover:text-white" aria-label="Fermer l’édition du lien">Fermer</button>
           </div>
-          <label className="mb-2 block text-[10px] font-semibold uppercase text-slate-500">
+          <label className="mb-2 block text-[10px] font-semibold uppercase text-slate-400">
             Type de prise
-            <select value={selectedLink.cableType} onChange={(event) => updateSynopticLink(selectedLink.id, { cableType: event.target.value as CableType })} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700">
+            <select value={selectedLink.cableType} onChange={(event) => updateSynopticLink(selectedLink.id, { cableType: event.target.value as CableType })} className="mt-1 w-full rounded-lg border border-white/10 bg-ink-850 px-2 py-1.5 text-xs text-slate-200">
               {CABLE_TYPES.map((type) => <option key={type} value={type}>{CABLE_COLORS[type].label}</option>)}
             </select>
           </label>
-          <label className="block text-[10px] font-semibold uppercase text-slate-500">
+          <label className="block text-[10px] font-semibold uppercase text-slate-400">
             Libellé
-            <input value={selectedLink.label ?? ""} onChange={(event) => updateSynopticLink(selectedLink.id, { label: event.target.value || undefined })} placeholder="Ex. Caméra 1 → ATEM" className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-violet-500" />
+            <input value={selectedLink.label ?? ""} onChange={(event) => updateSynopticLink(selectedLink.id, { label: event.target.value || undefined })} placeholder="Ex. Caméra 1 → ATEM" className="mt-1 w-full rounded-lg border border-white/10 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-violet-500" />
           </label>
           <button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.preventDefault(); event.stopPropagation(); removeSynopticLink(selectedLink.id); setSelectedLinkId(null); }} className="mt-3 flex w-full items-center justify-center rounded-lg bg-red-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-red-700">Supprimer le lien</button>
         </div>
       )}
 
       {/* Légende en haut à droite (fidele à l'image fournie) */}
-      <div className="synoptic-ui absolute right-4 top-3 z-30 rounded-2xl border border-slate-300 bg-white/95 p-3 shadow-lg backdrop-blur">
+      <div className="synoptic-ui absolute right-4 top-3 z-30 rounded-2xl border border-white/10 bg-ink-850/95 p-3 shadow-lg backdrop-blur">
         <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Légende Câbles & Signaux</p>
-        <div className="space-y-1.5 text-[11px] font-medium text-slate-700">
+        <div className="space-y-1.5 text-[11px] font-medium text-slate-200">
           <div className="flex items-center justify-between gap-6">
             <span>Jack / Mini-jack</span>
             <span className="h-3 w-6 rounded bg-[#ec4899] shadow-sm" />
@@ -687,9 +738,9 @@ export function SynopticBoard() {
             <span>XLR</span>
             <span className="h-3 w-6 rounded bg-[#3b82f6] shadow-sm" />
           </div>
-          <div className="mt-2 flex items-center justify-between gap-6 pt-1.5 border-t border-slate-200 text-red-600 font-semibold text-[10px]">
+          <div className="mt-2 flex items-center justify-between gap-6 pt-1.5 border-t border-white/8 text-red-400 font-semibold text-[10px]">
             <span>Besoin d'une alim</span>
-            <div className="flex items-center justify-center h-4 w-4 rounded-full bg-red-100 text-red-600">
+            <div className="flex items-center justify-center h-4 w-4 rounded-full bg-red-100 text-red-400">
               <Zap size={11} fill="currentColor" />
             </div>
           </div>
@@ -697,22 +748,22 @@ export function SynopticBoard() {
       </div>
 
       {/* Contrôles de Zoom */}
-      <div className="synoptic-ui absolute bottom-4 right-4 z-30 flex items-center gap-1 rounded-xl border border-slate-300 bg-white p-1 shadow-md">
+      <div className="synoptic-ui absolute bottom-4 right-4 z-30 flex items-center gap-1 rounded-xl border border-white/10 bg-ink-850 p-1 shadow-md">
         <button
           type="button"
           onClick={() => setZoom((z) => Math.max(0.4, z - 0.1))}
-          className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100"
+          className="rounded-lg p-1.5 text-slate-300 hover:bg-white/10"
           title="Zoom arrière"
         >
           <ZoomOut size={16} />
         </button>
-        <span className="w-12 text-center text-xs font-mono font-medium text-slate-600">
+        <span className="w-12 text-center text-xs font-mono font-medium text-slate-300">
           {Math.round(zoom * 100)}%
         </span>
         <button
           type="button"
           onClick={() => setZoom((z) => Math.min(1.8, z + 0.1))}
-          className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100"
+          className="rounded-lg p-1.5 text-slate-300 hover:bg-white/10"
           title="Zoom avant"
         >
           <ZoomIn size={16} />
@@ -723,7 +774,7 @@ export function SynopticBoard() {
             setZoom(0.85);
             setPan({ x: 40, y: 30 });
           }}
-          className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100"
+          className="rounded-lg p-1.5 text-slate-300 hover:bg-white/10"
           title="Recentrer"
         >
           <Maximize2 size={16} />
@@ -742,22 +793,15 @@ export function SynopticBoard() {
         onWheel={onWheel}
         onDragOver={(e) => e.preventDefault()}
         onDrop={onDrop}
-        className={`absolute inset-0 overflow-hidden ${spacePan || isPanning ? "cursor-grab active:cursor-grabbing" : marquee ? "cursor-crosshair" : "cursor-default"}`}
-        style={{
-          backgroundColor: "#ffffff",
-          backgroundImage:
-            "radial-gradient(#cbd5e1 1px, transparent 1px), radial-gradient(#f1f5f9 1px, #ffffff 1px)",
-          backgroundSize: "24px 24px",
-          backgroundPosition: "0 0, 12px 12px",
-        }}
+        className={`synoptic-dots absolute inset-0 overflow-hidden ${spacePan || isPanning ? "cursor-grab active:cursor-grabbing" : marquee ? "cursor-crosshair" : "cursor-default"}`}
       >
         {isBoardEmpty && (
-          <div className="absolute left-1/2 top-1/2 z-10 w-[min(520px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-violet-200 bg-white/90 p-6 text-center shadow-2xl backdrop-blur-sm">
+          <div className="absolute left-1/2 top-1/2 z-10 w-[min(520px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-violet-400/30 bg-ink-850/90 p-6 text-center shadow-2xl backdrop-blur-sm">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-100 text-violet-700">
               <Network size={28} />
             </div>
-            <h3 className="mt-4 text-xl font-bold text-slate-900">Le synoptique est vide</h3>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+            <h3 className="mt-4 text-xl font-bold text-slate-100">Le synoptique est vide</h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-300">
               Génère une structure depuis le plan ou ajoute un premier équipement pour commencer le câblage technique.
             </p>
             <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
@@ -771,7 +815,7 @@ export function SynopticBoard() {
               <button
                 type="button"
                 onClick={() => setShowAddMenu(true)}
-                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                className="rounded-xl border border-white/10 bg-ink-850 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:bg-white/10"
               >
                 Ajouter un appareil
               </button>
@@ -788,7 +832,7 @@ export function SynopticBoard() {
           }}
         >
           {/* Lignes de câblage SVG */}
-          <svg className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true">
+          <svg className="pointer-events-none absolute inset-0 z-10 h-full w-full overflow-visible" aria-hidden="true">
             <defs>
               <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
                 <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#000" floodOpacity="0.15" />
@@ -796,8 +840,8 @@ export function SynopticBoard() {
             </defs>
 
             {links.map((link) => {
-              const start = getPortCoordinates(link.fromNodeId, link.fromPortId, true);
-              const end = getPortCoordinates(link.toNodeId, link.toPortId, false);
+              const start = getPortCoordinates(link.fromNodeId, link.fromPortId, true, link.cableType);
+              const end = getPortCoordinates(link.toNodeId, link.toPortId, false, link.cableType);
               if (!start || !end) return null;
 
               const cableCfg = CABLE_COLORS[link.cableType] || CABLE_COLORS.hdmi;
@@ -834,7 +878,7 @@ export function SynopticBoard() {
                     d={pathD}
                     fill="none"
                     stroke={cableCfg.color}
-                    strokeWidth={isSelected ? "3.5" : "2.5"}
+                    strokeWidth={isSelected ? "4.5" : "3.5"}
                     strokeLinecap="round"
                     filter="url(#shadow)"
                   />
@@ -872,8 +916,8 @@ export function SynopticBoard() {
               {(() => {
                 const link = links.find((l) => l.id === selectedLinkId);
                 if (!link) return null;
-                const start = getPortCoordinates(link.fromNodeId, link.fromPortId, true);
-                const end = getPortCoordinates(link.toNodeId, link.toPortId, false);
+                const start = getPortCoordinates(link.fromNodeId, link.fromPortId, true, link.cableType);
+                const end = getPortCoordinates(link.toNodeId, link.toPortId, false, link.cableType);
                 if (!start || !end) return null;
                 const midX = (start.x + end.x) / 2;
                 const midY = (start.y + end.y) / 2;
@@ -962,11 +1006,11 @@ export const DeviceNodeCard = memo(function DeviceNodeCard({
   onTrace: () => void;
   error?: { message: string; severity: "error" | "warning" };
 }) {
-  const isMixer = node.deviceType === "mixer";
-  const isAudioMixer = node.deviceType === "audio";
-  const width = node.width || (isMixer ? 280 : isAudioMixer ? 250 : 200);
+  const width = synopticNodeWidth(node);
   const portsIn = node.portsIn ?? [];
   const portsOut = node.portsOut ?? [];
+  const portCount = Math.max(portsIn.length, portsOut.length, 1);
+  const cardHeight = node.height ?? Math.max(140, 61 + portCount * 32);
 
   const onTitleChange = (e: ChangeEvent<HTMLInputElement>) => onUpdate(node.id, { title: e.target.value });
   const onSubtitleChange = (e: ChangeEvent<HTMLInputElement>) => onUpdate(node.id, { subtitle: e.target.value });
@@ -979,12 +1023,12 @@ export const DeviceNodeCard = memo(function DeviceNodeCard({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
-      className={`synoptic-card group absolute flex cursor-move flex-col rounded-lg border-2 bg-white text-slate-800 shadow-md transition-shadow hover:shadow-xl ${selected ? "border-violet-600 ring-4 ring-violet-300/40" : "border-slate-700"}`}
+      className={`synoptic-card group absolute z-20 flex cursor-move flex-col rounded-xl border bg-gradient-to-b from-ink-800 to-ink-850 text-slate-100 shadow-[0_8px_28px_rgb(0_0_0/0.35)] transition-shadow hover:shadow-[0_12px_36px_rgb(0_0_0/0.5)] ${selected ? "border-violet-400 ring-4 ring-violet-400/25" : "border-white/12"}`}
       style={{
         left: node.x,
         top: node.y,
         width: `${width}px`,
-        minHeight: node.height ? `${node.height}px` : "100px",
+        height: `${cardHeight}px`,
       }}
     >
       {/* Indicateur de besoin d'alimentation (Prise rouge) */}
@@ -1000,19 +1044,19 @@ export const DeviceNodeCard = memo(function DeviceNodeCard({
       )}
 
       {/* Cartouche supérieur : Nom & Sous-titre */}
-      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-2.5 py-1.5 rounded-t-md">
+      <div className="flex items-center justify-between border-b border-white/8 bg-white/[0.04] px-2.5 py-1.5 rounded-t-xl">
         <div className="min-w-0 flex-1">
           <input
             value={node.title ?? ""}
             onChange={onTitleChange}
-            className="w-full truncate bg-transparent text-[11px] font-bold text-slate-900 outline-none hover:bg-white focus:bg-white focus:ring-1 focus:ring-violet-500 rounded px-0.5"
+            className="w-full truncate bg-transparent text-[11px] font-bold text-slate-100 outline-none hover:bg-white/10 focus:bg-white/10 focus:ring-1 focus:ring-violet-500 rounded px-0.5"
             placeholder="Nom de l'appareil"
           />
           {node.subtitle !== undefined && (
             <input
               value={node.subtitle}
               onChange={onSubtitleChange}
-              className="w-full truncate bg-transparent text-[9.5px] font-medium text-slate-500 outline-none hover:bg-white focus:bg-white focus:ring-1 focus:ring-violet-500 rounded px-0.5"
+              className="w-full truncate bg-transparent text-[9.5px] font-medium text-slate-400 outline-none hover:bg-white/10 focus:bg-white/10 focus:ring-1 focus:ring-violet-500 rounded px-0.5"
               placeholder="Détail / Référence"
             />
           )}
@@ -1038,9 +1082,9 @@ export const DeviceNodeCard = memo(function DeviceNodeCard({
       </div>
 
       {/* Colonnes IN / Centre (Visuel) / OUT */}
-      <div className="relative flex min-w-0 flex-1 items-stretch justify-between gap-1 p-2">
+      <div className="relative grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_96px_minmax(0,1fr)] items-stretch gap-1 p-2">
         {/* Colonne IN (Gauche) */}
-        <div className="min-w-0 w-[34%] flex flex-col text-[10px]">
+        <div className="min-w-0 flex flex-col text-[10px]">
           {portsIn.length > 0 && (
             <span className="flex h-4 items-center text-[8px] font-bold uppercase tracking-wider text-slate-400">IN</span>
           )}
@@ -1051,30 +1095,31 @@ export const DeviceNodeCard = memo(function DeviceNodeCard({
                 key={port.id}
                 data-synoptic-node={node.id}
                 data-synoptic-port={port.id}
+                data-synoptic-direction="in"
                 onPointerUp={(e) => onCompleteLinking(node, port, e)}
-                className="port-handle flex h-6 min-w-0 max-w-full items-center gap-1.5 cursor-pointer rounded px-1 hover:bg-slate-100 transition"
+                className="port-handle flex h-8 min-w-0 max-w-full items-center gap-1.5 cursor-pointer rounded px-1 py-1 hover:bg-white/10 transition"
                 title={`Entrée ${port.name} (${cableCfg.label}) - Déposer un câble ici`}
               >
                 <div
-                  className="h-3 w-3 rounded-full border border-slate-600 flex items-center justify-center bg-white shadow-xs"
+                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 bg-ink-850 shadow-sm"
                   style={{ borderColor: cableCfg.color }}
                 >
                   <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: cableCfg.color }} />
                 </div>
-                <span className="min-w-0 truncate font-semibold text-slate-700">{port.name} <span className="font-mono text-[8px] text-slate-400">({cableCfg.label})</span></span>
+                <span className="min-w-0 whitespace-normal break-words text-[10px] font-semibold leading-tight text-slate-200">{port.name} <span className="font-mono text-[8px] text-slate-400">({cableCfg.label})</span></span>
               </div>
             );
           })}
         </div>
 
         {/* Visuel central de l'équipement */}
-        <div className="min-w-0 flex flex-1 flex-col items-center justify-center overflow-hidden p-2 text-slate-400">
+        <div className="flex min-w-0 flex-col items-center justify-center overflow-visible p-2 text-slate-400">
           <VisualAsset
             visualKey={node.visualKey ?? node.deviceType ?? "generic"}
             image={node.image}
-            fit={node.fit}
+            fit="contain"
             background={node.background}
-            className="h-20 w-24"
+            className="h-20 w-24 shrink-0"
             alt={node.title}
             fallback={node.category
               ? <ItemGlyph category={node.category} catalogId={node.visualKey ?? ""} color={node.color} size={42} />
@@ -1087,7 +1132,7 @@ export const DeviceNodeCard = memo(function DeviceNodeCard({
             </div>
           )}
           {error && (
-            <div className={`mt-2 flex items-center gap-1 rounded px-1.5 py-0.5 text-[8.5px] font-bold ${error.severity === "error" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+            <div className={`mt-2 flex items-center gap-1 rounded px-1.5 py-0.5 text-[8.5px] font-bold ${error.severity === "error" ? "bg-red-100 text-red-700" : "bg-[#fef3c7] text-amber-700"}`}>
               <AlertTriangle size={10} />
               <span className="truncate">{error.message}</span>
             </div>
@@ -1095,7 +1140,7 @@ export const DeviceNodeCard = memo(function DeviceNodeCard({
         </div>
 
         {/* Colonne OUT (Droite) */}
-        <div className="min-w-0 w-[34%] flex flex-col items-end text-[10px]">
+        <div className="min-w-0 flex flex-col items-end text-[10px]">
           {portsOut.length > 0 && (
             <span className="flex h-4 items-center text-[8px] font-bold uppercase tracking-wider text-slate-400">OUT</span>
           )}
@@ -1106,13 +1151,14 @@ export const DeviceNodeCard = memo(function DeviceNodeCard({
                 key={port.id}
                 data-synoptic-node={node.id}
                 data-synoptic-port={port.id}
+                data-synoptic-direction="out"
                 onPointerDown={(e) => onStartLinking(node, port, e)}
-                className="port-handle flex h-6 min-w-0 max-w-full items-center justify-end gap-1.5 cursor-pointer rounded px-1 hover:bg-slate-100 transition"
+                className="port-handle flex h-8 min-w-0 max-w-full items-center justify-end gap-1.5 cursor-pointer rounded px-1 py-1 hover:bg-white/10 transition"
                 title={`Sortie ${port.name} (${cableCfg.label}) - Glisser pour relier`}
               >
-                <span className="min-w-0 truncate text-right font-semibold text-slate-700">{port.name} <span className="font-mono text-[8px] text-slate-400">({cableCfg.label})</span></span>
+                <span className="min-w-0 whitespace-normal break-words text-right text-[10px] font-semibold leading-tight text-slate-200">{port.name} <span className="font-mono text-[8px] text-slate-400">({cableCfg.label})</span></span>
                 <div
-                  className="h-3 w-3 rounded-full border border-slate-600 flex items-center justify-center bg-white shadow-xs"
+                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 bg-ink-850 shadow-sm"
                   style={{ borderColor: cableCfg.color }}
                 >
                   <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: cableCfg.color }} />
@@ -1153,7 +1199,7 @@ function DeviceIllustration({ deviceType }: { deviceType: SynopticDeviceType }) 
             </div>
             <div className="flex justify-around">
               <div className="h-8 w-1.5 rounded-full bg-slate-600 flex items-end">
-                <div className="h-3 w-full bg-red-400" />
+                <div className="h-3 w-full bg-[#f87171]" />
               </div>
               <div className="h-8 w-1.5 rounded-full bg-slate-600 flex items-end">
                 <div className="h-4 w-full bg-white" />

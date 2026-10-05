@@ -44,7 +44,7 @@ export function ProjectManagerModal({ onClose }: { onClose: () => void }) {
     const load = (project: SavedProject) => { importProject(project.data); onClose(); };
     const create = () => { resetBoard(); onClose(); };
     return <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-        <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-[#10141c] p-5 shadow-2xl">
+        <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-surface p-5 shadow-2xl">
             <div className="flex items-start justify-between"><div><p className="text-[10px] uppercase tracking-[0.2em] text-cyan-200/70">Projets</p><h2 className="mt-1 text-lg font-semibold text-white">Bibliothèque de projets</h2></div><button type="button" onClick={onClose} aria-label="Fermer"><X size={18} /></button></div>
             <div className="mt-5 flex flex-wrap gap-2">
                 <button type="button" onClick={save} className="flex items-center gap-2 rounded-lg bg-amber-300 px-3 py-2 text-xs font-semibold text-black"><Save size={14} /> Enregistrer</button>

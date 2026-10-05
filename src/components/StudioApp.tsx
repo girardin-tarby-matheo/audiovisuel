@@ -7,13 +7,15 @@ import { TopBar } from "./TopBar";
 import { CatalogManagerModal } from "./CatalogManagerModal";
 import { ProjectManagerModal } from "./ProjectManagerModal";
 import { useStudio } from "../store/studioStore";
-import { Clapperboard, MousePointer2, Hand, Download, ArrowRight } from "lucide-react";
+import { undo, redo } from "../store/history";
+import { GRID_SIZE } from "../lib/constants";
+import { Clapperboard, MousePointer2, Hand, Download, ArrowRight, Undo2, Move } from "lucide-react";
 
 function WelcomeOverlay({ onDismiss }: { onDismiss: () => void }) {
   return (
     <div className="animate-fade-in fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm">
       <div
-        className="mx-4 max-w-lg rounded-3xl border border-white/10 bg-gradient-to-b from-[#13161f] to-[#0c0e14] p-8 shadow-2xl"
+        className="mx-4 max-w-lg rounded-3xl border border-white/10 bg-gradient-to-b from-surface to-chrome p-8 shadow-2xl"
         style={{ animation: "modal-in 350ms cubic-bezier(0.16, 1, 0.3, 1) both" }}
       >
         <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-300/20 to-cyan-300/10">
@@ -28,6 +30,8 @@ function WelcomeOverlay({ onDismiss }: { onDismiss: () => void }) {
             { icon: <MousePointer2 size={15} />, key: "V", text: "Mode sélection & édition" },
             { icon: <Hand size={15} />, key: "Espace / H", text: "Mode déplacement du plateau" },
             { icon: <Download size={15} />, key: "Molette", text: "Zoom avant / arrière" },
+            { icon: <Undo2 size={15} />, key: "Ctrl + Z / Y", text: "Annuler / rétablir" },
+            { icon: <Move size={15} />, key: "Flèches", text: "Déplacer la sélection (Maj = x4)" },
           ].map((hint) => (
             <div key={hint.key} className="flex items-center gap-3 rounded-xl bg-white/[0.03] px-3 py-2.5">
               <span className="text-amber-200/80">{hint.icon}</span>
@@ -41,7 +45,7 @@ function WelcomeOverlay({ onDismiss }: { onDismiss: () => void }) {
         <button
           type="button"
           onClick={onDismiss}
-          className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-300/90 py-3 text-sm font-semibold text-ink-950 transition hover:bg-amber-200"
+          className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-300/90 py-3 text-sm font-semibold text-ink-950 transition hover:bg-[#fde68a]"
         >
           Commencer
           <ArrowRight size={16} />
@@ -71,7 +75,7 @@ function ToastBar({ message, onDismiss }: { message: string; onDismiss: () => vo
       className="toast-in pointer-events-auto cursor-pointer absolute bottom-20 left-1/2 z-50 -translate-x-1/2 select-none transition-transform hover:scale-105 active:scale-95"
       title="Cliquer pour fermer"
     >
-      <div className="flex items-center gap-2.5 overflow-hidden rounded-2xl border border-white/10 bg-[#12161f]/95 px-4 py-2.5 shadow-2xl backdrop-blur-md">
+      <div className="flex items-center gap-2.5 overflow-hidden rounded-2xl border border-white/10 bg-surface/95 px-4 py-2.5 shadow-2xl backdrop-blur-md">
         {isSuccess ? (
           <svg width="16" height="16" viewBox="0 0 16 16" className="shrink-0 text-emerald-400">
             <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
@@ -115,6 +119,35 @@ export default function StudioApp() {
     } catch {
       setShowWelcome(true);
     }
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable) return;
+      const mod = event.ctrlKey || event.metaKey;
+      const key = event.key.toLowerCase();
+      const state = useStudio.getState();
+      if (mod && key === "z") {
+        event.preventDefault();
+        if (event.shiftKey) redo(); else undo();
+      } else if (mod && key === "y") {
+        event.preventDefault();
+        redo();
+      } else if (state.viewMode === "plan" && mod && key === "a") {
+        event.preventDefault();
+        state.selectMany(state.items.map((item) => item.id));
+      } else if (state.viewMode === "plan" && key.startsWith("arrow") && state.selectedIds.length && !mod) {
+        event.preventDefault();
+        const step = event.shiftKey ? GRID_SIZE * 4 : GRID_SIZE;
+        const dx = key === "arrowleft" ? -step : key === "arrowright" ? step : 0;
+        const dy = key === "arrowup" ? -step : key === "arrowdown" ? step : 0;
+        const selected = new Set(state.selectedIds);
+        state.moveItems(state.items.filter((item) => selected.has(item.id)).map((item) => ({ id: item.id, x: item.x + dx, y: item.y + dy })));
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
   const dismissWelcome = useCallback(() => {

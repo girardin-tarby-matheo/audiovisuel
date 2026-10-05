@@ -10,6 +10,7 @@ export function Sidebar() {
   const addFromCatalog = useStudio((s) => s.addFromCatalog);
   const camera = useStudio((s) => s.camera);
   const selectedId = useStudio((s) => s.selectedId);
+  const selectedCount = useStudio((s) => s.selectedIds.length);
   const items = useStudio((s) => s.items);
   const catalog = useStudio((s) => s.catalog);
   const setCatalogModalOpen = useStudio((s) => s.setCatalogModalOpen);
@@ -174,7 +175,7 @@ export function Sidebar() {
 
       {selectedId && (
         <p className="border-t border-white/6 px-4 py-2 text-[10px] text-slate-500">
-          Un élément est sélectionné sur le plateau.
+          {selectedCount > 1 ? `${selectedCount} éléments sélectionnés` : "Un élément est sélectionné"} · Flèches pour déplacer, Ctrl+Z pour annuler
         </p>
       )}
     </aside>
@@ -216,7 +217,7 @@ export function BottomToolbar() {
   };
 
   return (
-    <div className="no-export pointer-events-auto absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 rounded-2xl border border-white/10 bg-[#10141c]/90 p-1.5 shadow-2xl backdrop-blur-md">
+    <div className="no-export pointer-events-auto absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 rounded-2xl border border-white/10 bg-surface/90 p-1.5 shadow-2xl backdrop-blur-md">
       <ToolBtn active={!panOn && tool === "select"} onClick={() => setTool("select")} label="Sélection (V)">
         <MousePointer2 size={16} />
       </ToolBtn>
