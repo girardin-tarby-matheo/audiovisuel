@@ -1,7 +1,7 @@
 import { CATALOG_MAP } from "./catalog";
 import type { BoardObject } from "./types";
 
-export type LabelPlacement = { id: string; x: number; y: number; width: number; side: "below" | "above" | "right" | "left" };
+export type LabelPlacement = { id: string; x: number; y: number; width: number; side: "below" | "above" | "right" | "left" | "custom" };
 
 type Rect = { left: number; top: number; right: number; bottom: number };
 
@@ -42,8 +42,18 @@ export function computeLabelPlacements(items: BoardObject[]): Map<string, LabelP
   const placed: Rect[] = [];
   const result = new Map<string, LabelPlacement>();
 
+  // Les noms placés à la main sont fixes et servent d'obstacles aux autres.
+  items.forEach((item) => {
+    if (!item.labelOffset) return;
+    const width = labelWidth(item.name);
+    const x = item.x + item.labelOffset.x;
+    const y = item.y + item.labelOffset.y;
+    placed.push({ left: x - width / 2, top: y - LABEL_HEIGHT / 2, right: x + width / 2, bottom: y + LABEL_HEIGHT / 2 });
+    result.set(item.id, { id: item.id, side: "custom", width, x, y });
+  });
+
   // Du haut vers le bas : les noms du dessous se décalent autour de ceux déjà posés.
-  [...items].sort((a, b) => a.y - b.y || a.x - b.x).forEach((item) => {
+  [...items].filter((item) => !item.labelOffset).sort((a, b) => a.y - b.y || a.x - b.x).forEach((item) => {
     const box = bounds.get(item.id)!;
     const width = labelWidth(item.name);
     const cx = item.x;

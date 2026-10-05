@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import type { DragEvent, PointerEvent as ReactPointerEvent } from "react";
 import { BoardNode } from "./BoardNode";
+import { ItemLabel } from "./ItemLabel";
 import { computeLabelPlacements } from "../lib/labelLayout";
 import { BottomToolbar } from "./Sidebar";
 import { screenToWorld, useStudio } from "../store/studioStore";
@@ -302,26 +303,7 @@ export function CanvasBoard() {
   const labelLayer = visibleItems.map((item) => {
     const place = placements.get(item.id);
     if (!place) return null;
-    const selected = selectedIds.includes(item.id);
-    return (
-      <div
-        key={`label-${item.id}`}
-        className="pointer-events-none absolute text-center"
-        style={{ left: place.x, top: place.y, width: place.width, transform: "translate(-50%, -50%)", zIndex: selected ? 40 : 15 }}
-      >
-        <p
-          className={`item-label mx-auto truncate rounded-full border px-2.5 py-[3px] text-[11px] font-semibold leading-tight backdrop-blur-sm transition-colors ${selected ? "border-amber-300/50 bg-surface/90 text-amber-100" : "border-white/10 bg-surface/70 text-slate-100"}`}
-          style={{ width: "fit-content", maxWidth: "100%" }}
-        >
-          {item.name}
-        </p>
-        {selected && item.notes && (
-          <p className="item-label mx-auto mt-1 w-max max-w-[220px] rounded-md bg-surface/85 px-2 py-0.5 text-[9.5px] leading-snug text-slate-300 backdrop-blur-sm">
-            {item.notes}
-          </p>
-        )}
-      </div>
-    );
+    return <ItemLabel key={`label-${item.id}`} item={item} place={place} selected={selectedIds.includes(item.id)} zoom={camera.zoom} onSelect={select} onUpdate={updateItem} />;
   });
 
   return (

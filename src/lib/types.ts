@@ -87,6 +87,8 @@ export type BoardObject = {
   deviceType?: SynopticDeviceType;
   layer: BoardLayer;
   specs?: EquipmentSpecs;
+  /** Décalage manuel du nom par rapport au centre de l'objet ; absent = placement automatique. */
+  labelOffset?: { x: number; y: number };
 };
 
 export type EquipmentSpecs = {
