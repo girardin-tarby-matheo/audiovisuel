@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, memo, type PointerEvent as ReactPointerEvent } from "react";
+import { useRef, useEffect, useCallback, memo, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { ItemGlyph } from "./ItemGlyph";
 import { VisualAsset } from "./VisualAsset";
 import { CATALOG_MAP } from "../lib/catalog";
@@ -143,8 +143,9 @@ export const BoardNode = memo(function BoardNode({ item, selected, selectedItems
   const lightPath = `M 0 0 L ${Math.sin(-halfBeam) * beamRange} ${-Math.cos(-halfBeam) * beamRange} A ${beamRange} ${beamRange} 0 ${item.beamSpread > 180 ? 1 : 0} 1 ${Math.sin(halfBeam) * beamRange} ${-Math.cos(halfBeam) * beamRange} Z`;
 
   // Intensity-based opacity for hex strings
-  const glowAlpha = Math.round(item.intensity * 0.7).toString(16).padStart(2, "0");
-  const beamAlpha = Math.round(20 + item.intensity * 0.35).toString(16).padStart(2, "0");
+  // La puissance (10-100) pilote l'intensité du halo, du faisceau et du pion.
+  const power = Math.min(1, Math.max(0, item.intensity / 100));
+  const glowPercent = Math.round(8 + 62 * power);
 
   return (
     <div
@@ -274,7 +275,7 @@ export const BoardNode = memo(function BoardNode({ item, selected, selectedItems
           className="beam-svg pointer-events-none absolute left-1/2 top-1/2 overflow-visible"
           width="1"
           height="1"
-          style={{ color: item.color, opacity: selected ? 0.95 : 0.72, transition: "opacity 200ms" }}
+          style={{ color: item.color, "--p": 0.55, opacity: selected ? 0.95 : 0.72, transition: "opacity 200ms" } as CSSProperties}
         >
           <defs>
             <linearGradient id={`cam-grad-${item.id}`} x1="0" y1="0" x2="0" y2="1">
@@ -313,7 +314,7 @@ export const BoardNode = memo(function BoardNode({ item, selected, selectedItems
               color: item.color,
               width: item.beamRadius * 1.15 * item.scale,
               height: item.beamRadius * 1.15 * item.scale,
-              background: `radial-gradient(circle, ${item.color}${glowAlpha} 0%, ${item.color}00 72%)`,
+              background: `radial-gradient(circle, color-mix(in srgb, ${item.color} ${glowPercent}%, transparent) 0%, transparent 72%)`,
               filter: `blur(${6 + item.intensity / 18}px)`,
               transition: "width 200ms, height 200ms, filter 200ms",
             }}
@@ -323,19 +324,20 @@ export const BoardNode = memo(function BoardNode({ item, selected, selectedItems
             className="beam-svg pointer-events-none absolute left-1/2 top-1/2 overflow-visible"
             width="1"
             height="1"
-            style={{ color: item.color }}
+            style={{ color: item.color, "--p": power } as CSSProperties}
           >
             <defs>
               <radialGradient id={`light-grad-${item.id}`}>
-                <stop className="beam-stop-start" offset="0%" stopColor={item.color} stopOpacity="0.3" />
-                <stop className="beam-stop-end" offset="100%" stopColor={item.color} stopOpacity="0.04" />
+                <stop className="beam-stop-start" offset="0%" stopColor={item.color} stopOpacity={0.12 + 0.62 * power} />
+                <stop className="beam-stop-end" offset="100%" stopColor={item.color} stopOpacity={0.03 + 0.14 * power} />
               </radialGradient>
             </defs>
             <path
               className="beam-path"
               d={lightPath}
               fill={`url(#light-grad-${item.id})`}
-              stroke={`${item.color}55`}
+              stroke={item.color}
+              strokeOpacity={0.3 + 0.6 * power}
               strokeWidth="0.8"
               style={{ transition: "d 180ms" }}
             />
@@ -378,7 +380,7 @@ export const BoardNode = memo(function BoardNode({ item, selected, selectedItems
             borderColor: selected ? "rgb(252 211 77 / 0.75)" : `${item.color}77`,
           } : {}),
           boxShadow: item.category === "light"
-            ? `0 0 ${selected ? 32 : 22}px ${item.color}${selected ? "66" : "44"}, 0 8px 20px rgb(0 0 0 / 0.25)`
+            ? `0 0 ${Math.round((selected ? 18 : 10) + 22 * power)}px color-mix(in srgb, ${item.color} ${Math.round(20 + 50 * power)}%, transparent), 0 8px 20px rgb(0 0 0 / 0.25)`
             : selected
               ? "0 0 0 1px rgba(245,185,66,0.3), 0 12px 40px rgba(0,0,0,0.35)"
               : "0 8px 24px rgb(0 0 0 / 0.22)",

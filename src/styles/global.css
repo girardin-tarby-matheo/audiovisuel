@@ -663,15 +663,12 @@ html[data-theme="light"] .item-label {
 html[data-theme="light"] .beam-stop-start,
 html[data-theme="light"] .beam-stop-end { stop-color: color-mix(in srgb, currentColor 78%, #0f172a); }
 
-html[data-theme="light"] .beam-stop-start { stop-opacity: 0.6; }
-html[data-theme="light"] .beam-stop-end { stop-opacity: 0.14; }
+html[data-theme="light"] .beam-stop-start { stop-opacity: calc(0.14 + 0.62 * var(--p, 0.6)); }
+html[data-theme="light"] .beam-stop-end { stop-opacity: calc(0.04 + 0.16 * var(--p, 0.6)); }
 
 html[data-theme="light"] .beam-path {
   stroke: color-mix(in srgb, currentColor 80%, #0f172a);
-  stroke-opacity: 0.85;
+  stroke-opacity: calc(0.3 + 0.6 * var(--p, 0.6));
   stroke-width: 1.6;
 }
 
-html[data-theme="light"] .beam-glow {
-  background: radial-gradient(circle, color-mix(in srgb, currentColor 62%, transparent) 0%, transparent 72%) !important;
-}
