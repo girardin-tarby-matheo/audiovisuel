@@ -1,5 +1,5 @@
 import { useRef, useEffect, type ReactNode } from "react";
-import { Trash2, Info } from "lucide-react";
+import { Trash2, Info, ImagePlus, Star, MousePointer2 } from "lucide-react";
 import { ItemGlyph } from "./ItemGlyph";
 import { CATALOG_MAP } from "../lib/catalog";
 import { useStudio } from "../store/studioStore";
@@ -25,14 +25,14 @@ export function PropertiesPanel() {
 
   if (!item) {
     return (
-      <aside className="flex w-[300px] shrink-0 flex-col border-l border-white/6 bg-chrome">
+      <aside className="panel-glass flex w-[300px] shrink-0 flex-col !border-l !border-r-0 border-l-white/6">
         <div className="border-b border-white/6 px-4 py-4">
           <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-violet-200/70">Propriétés</p>
           <h2 className="mt-1 text-sm font-semibold text-white">Aucun élément</h2>
         </div>
         <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/[0.03]">
-            <Info size={24} className="text-slate-600" />
+            <MousePointer2 size={24} className="text-slate-500" />
           </div>
           <p className="text-sm leading-relaxed text-slate-400">
             Sélectionnez un objet sur le plateau pour éditer ses propriétés.
@@ -46,7 +46,7 @@ export function PropertiesPanel() {
   }
 
   return (
-    <aside className="flex w-[300px] shrink-0 flex-col border-l border-white/6 bg-chrome">
+    <aside className="panel-glass flex w-[300px] shrink-0 flex-col !border-l !border-r-0 border-l-white/6">
       {/* Header with preview */}
       <div className="border-b border-white/6 px-4 py-4">
         <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-violet-200/70">Propriétés</p>
@@ -103,7 +103,7 @@ export function PropertiesPanel() {
 
         {/* Geometry */}
         <div className="rounded-xl border border-white/6 bg-white/[0.02] p-3 space-y-3">
-          <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-slate-500">Géométrie</p>
+          <p className="section-title">Géométrie</p>
           <SliderField
             label="Rotation"
             value={item.rotation}
@@ -181,8 +181,8 @@ export function PropertiesPanel() {
           </div>
 
           <div className="flex items-center gap-2.5">
-            <label className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 py-2 text-xs text-slate-300 hover:bg-white/10 cursor-pointer transition">
-              <span>📷 Choisir une photo</span>
+            <label className="btn flex-1 cursor-pointer">
+              <ImagePlus size={14} /><span>Choisir une photo</span>
               <input
                 type="file"
                 accept="image/*"
@@ -296,9 +296,10 @@ export function PropertiesPanel() {
           <button
             type="button"
             onClick={() => useStudio.getState().saveItemToCatalog(item.id)}
-            className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-amber-400/30 bg-amber-400/10 py-2 text-xs font-semibold text-amber-200 hover:bg-amber-400/20 transition"
+            className="btn btn-accent w-full"
           >
-            <span>⭐ Définir comme modèle par défaut</span>
+            <Star size={14} />
+            <span>Définir comme modèle par défaut</span>
           </button>
         </div>
       </div>
@@ -308,7 +309,7 @@ export function PropertiesPanel() {
         <button
           type="button"
           onClick={() => removeItem(item.id)}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/10 py-2.5 text-sm text-rose-200 transition-all duration-200 hover:bg-rose-400/20 hover:shadow-lg hover:shadow-rose-500/10 active:scale-[0.98]"
+          className="btn btn-danger w-full py-2.5 text-sm"
         >
           <Trash2 size={15} />
           Supprimer l'élément
@@ -322,7 +323,7 @@ export function PropertiesPanel() {
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-[10px] font-medium uppercase tracking-[0.16em] text-slate-500">{label}</span>
+      <span className="mb-1.5 block section-title">{label}</span>
       {children}
     </label>
   );
@@ -354,7 +355,7 @@ function SliderField({
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-slate-500">{label}</span>
+        <span className="section-title">{label}</span>
         <span className={`font-mono text-[11px] ${accentColor}`}>
           {displayValue}{unit}
         </span>
