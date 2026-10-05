@@ -38,7 +38,9 @@ export function TopBar({ onOpenProjects }: { onOpenProjects: () => void }) {
   const share = useCallback(async () => {
     if (shareState !== "idle") return;
     setShareState("busy");
-    const url = `${window.location.origin}/share/preview?data=${encodeURIComponent(exportProject())}`;
+    // L'image de fond est trop lourde pour une URL : elle n'est pas incluse dans le lien.
+    const shared = { ...JSON.parse(exportProject()), planBackground: null };
+    const url = `${window.location.origin}/share/preview?data=${encodeURIComponent(JSON.stringify(shared))}`;
     if (url.length > 8000) {
       setToast("Projet trop volumineux pour un lien partageable · Exportez le JSON");
       setShareState("idle");

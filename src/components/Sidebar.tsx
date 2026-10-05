@@ -3,6 +3,7 @@ import { Hand, MousePointer2, Minus, Plus, Maximize2, Search, X, Sparkles, Slide
 import { CATEGORIES } from "../lib/catalog";
 import { ItemGlyph } from "./ItemGlyph";
 import { VisualAsset } from "./VisualAsset";
+import { BackgroundPanel } from "./BackgroundPanel";
 import { useStudio } from "../store/studioStore";
 import type { BoardLayer } from "../lib/types";
 
@@ -122,6 +123,7 @@ export function Sidebar() {
             })}
           </div>
         </div>
+        <BackgroundPanel />
         {CATEGORIES.map((category) => {
           const catItems = filtered.filter((item) => item.category === category.id);
           if (catItems.length === 0) return null;

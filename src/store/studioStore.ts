@@ -4,7 +4,7 @@ import { CATALOG, CATALOG_MAP } from "../lib/catalog";
 import { SYNOPTIC_TEMPLATES } from "../lib/synopticTemplates";
 import { GRID_SIZE } from "../lib/constants";
 import { computeSynopticAutoLayout } from "../lib/synopticLayout";
-import type { BoardLayer, BoardObject, BoardStatus, CableType, CameraView, CatalogItem, SynopticLink, SynopticNode, ToolMode, ViewMode } from "../lib/types";
+import type { PlanBackground, BoardLayer, BoardObject, BoardStatus, CableType, CameraView, CatalogItem, SynopticLink, SynopticNode, ToolMode, ViewMode } from "../lib/types";
 
 const uid = () =>
   typeof crypto !== "undefined" && crypto.randomUUID
@@ -112,6 +112,8 @@ type StudioState = {
   synopticNodes: SynopticNode[];
   synopticLinks: SynopticLink[];
   visibleLayers: Record<BoardLayer, boolean>;
+  planBackground: PlanBackground | null;
+  planBackgroundEditing: boolean;
   highlightedNodeIds: string[];
   highlightedLinkIds: string[];
   isCatalogModalOpen: boolean;
@@ -135,6 +137,9 @@ type StudioState = {
   resetBoard: () => void;
   setViewMode: (viewMode: ViewMode) => void;
   setLayerVisibility: (layer: BoardLayer, visible: boolean) => void;
+  setPlanBackground: (background: PlanBackground | null) => void;
+  updatePlanBackground: (patch: Partial<PlanBackground>) => void;
+  setPlanBackgroundEditing: (editing: boolean) => void;
   traceSignal: (nodeId: string) => void;
   clearSignalTrace: () => void;
   addCatalogItem: (item: Omit<CatalogItem, "id"> & { id?: string }) => string;
@@ -177,6 +182,8 @@ export const useStudio = create<StudioState>()(
       synopticNodes: [],
       synopticLinks: [],
       visibleLayers: { ...DEFAULT_VISIBLE_LAYERS },
+      planBackground: null,
+      planBackgroundEditing: false,
       highlightedNodeIds: [],
       highlightedLinkIds: [],
       isCatalogModalOpen: false,
@@ -259,6 +266,12 @@ export const useStudio = create<StudioState>()(
       setToast: (toast) => set({ toast }),
       setViewMode: (viewMode) => set({ viewMode }),
       setLayerVisibility: (layer, visible) => set({ visibleLayers: { ...get().visibleLayers, [layer]: visible } }),
+      setPlanBackground: (planBackground) => set({ planBackground, planBackgroundEditing: false }),
+      updatePlanBackground: (patch) => {
+        const current = get().planBackground;
+        if (current) set({ planBackground: { ...current, ...patch } });
+      },
+      setPlanBackgroundEditing: (planBackgroundEditing) => set({ planBackgroundEditing }),
       traceSignal: (nodeId) => {
         const links = get().synopticLinks;
         const adjacent = new Map<string, string[]>();
@@ -792,6 +805,7 @@ export const useStudio = create<StudioState>()(
           synopticNodes: state.synopticNodes,
           synopticLinks: state.synopticLinks,
           visibleLayers: state.visibleLayers,
+          planBackground: state.planBackground,
         };
         return JSON.stringify(data, null, 2);
       },
@@ -808,6 +822,8 @@ export const useStudio = create<StudioState>()(
             viewMode: data.viewMode || "plan",
             synopticNodes: Array.isArray(data.synopticNodes) ? data.synopticNodes : [],
             synopticLinks: Array.isArray(data.synopticLinks) ? data.synopticLinks : [],
+            planBackground: data.planBackground?.image ? data.planBackground : null,
+            planBackgroundEditing: false,
             visibleLayers: { ...DEFAULT_VISIBLE_LAYERS, ...(data.visibleLayers || {}), accessories: data.visibleLayers?.accessories ?? data.visibleLayers?.data ?? true, lights: data.visibleLayers?.lights ?? data.visibleLayers?.power ?? true },
           });
           set({ toast: "Projet importé avec succès ✓" });
@@ -864,6 +880,8 @@ export const useStudio = create<StudioState>()(
           viewMode: "plan",
           synopticNodes: [],
           synopticLinks: [],
+          planBackground: null,
+          planBackgroundEditing: false,
         }),
     }),
     {
@@ -919,6 +937,7 @@ export const useStudio = create<StudioState>()(
         synopticNodes: state.synopticNodes,
         synopticLinks: state.synopticLinks,
         visibleLayers: state.visibleLayers,
+        planBackground: state.planBackground,
       }),
     },
   ),

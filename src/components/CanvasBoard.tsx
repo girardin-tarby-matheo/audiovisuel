@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import type { DragEvent, PointerEvent as ReactPointerEvent } from "react";
 import { BoardNode } from "./BoardNode";
 import { ItemLabel } from "./ItemLabel";
+import { PlanBackgroundImage } from "./PlanBackgroundImage";
 import { computeLabelPlacements } from "../lib/labelLayout";
 import { BottomToolbar } from "./Sidebar";
 import { screenToWorld, useStudio } from "../store/studioStore";
@@ -333,6 +334,7 @@ export function CanvasBoard() {
             height: 4000,
           }}
         >
+          <PlanBackgroundImage zoom={camera.zoom} />
           {labelLayer}
           {visibleItems.map((item) => (
             <BoardNode

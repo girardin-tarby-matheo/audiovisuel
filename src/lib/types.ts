@@ -137,3 +137,15 @@ export type SynopticLink = {
   cableType: CableType;
   label?: string;
 };
+
+/** Image de fond du plan (ex. plan de salle), placée en coordonnées du plateau. */
+export type PlanBackground = {
+  image: string;
+  /** Coin supérieur gauche, en coordonnées du plateau. */
+  x: number;
+  y: number;
+  /** Largeur en unités du plateau ; la hauteur suit le ratio. */
+  width: number;
+  aspect: number;
+  opacity: number;
+};
