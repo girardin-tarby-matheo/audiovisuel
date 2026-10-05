@@ -526,6 +526,7 @@ input[type="range"]:active::-webkit-slider-thumb {
    inverse tout l'interface sans dupliquer chaque classe. */
 html[data-theme="light"] {
   color-scheme: light;
+  --beam-gain: 2.5;
   --color-text: #0f172a;
   --color-canvas: #eef1f6;
   --color-surface: #ffffff;
@@ -661,7 +662,8 @@ html[data-theme="light"] .item-label {
 
 /* Thème clair : cônes et faisceaux renforcés (pensés à l'origine pour un fond sombre). */
 html[data-theme="light"] .beam-stop-start,
-html[data-theme="light"] .beam-stop-end { stop-color: color-mix(in srgb, currentColor 78%, #0f172a); }
+html[data-theme="light"] .beam-stop-end,
+html[data-theme="light"] .beam-stop-color { stop-color: color-mix(in srgb, currentColor 78%, #0f172a); }
 
 html[data-theme="light"] .beam-stop-start { stop-opacity: calc(0.2 + 0.7 * var(--p, 0.6)); }
 html[data-theme="light"] .beam-stop-end { stop-opacity: calc(0.04 + 0.16 * var(--p, 0.6)); }
@@ -672,3 +674,7 @@ html[data-theme="light"] .beam-path {
   stroke-width: 1.6;
 }
 
+
+html[data-theme="light"] .beam-outline {
+  stroke: color-mix(in srgb, currentColor 75%, #0f172a);
+}

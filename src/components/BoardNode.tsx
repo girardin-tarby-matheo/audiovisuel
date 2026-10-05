@@ -142,10 +142,13 @@ export const BoardNode = memo(function BoardNode({ item, selected, selectedItems
   const halfBeam = (item.beamSpread / 2) * (Math.PI / 180);
   const lightPath = `M 0 0 L ${Math.sin(-halfBeam) * beamRange} ${-Math.cos(-halfBeam) * beamRange} A ${beamRange} ${beamRange} 0 ${item.beamSpread > 180 ? 1 : 0} 1 ${Math.sin(halfBeam) * beamRange} ${-Math.cos(halfBeam) * beamRange} Z`;
 
-  // Cœur lumineux : cône plus étroit et plus court, à l'intérieur du faisceau.
-  const coreHalf = halfBeam * 0.45;
-  const coreRange = beamRange * 0.82;
-  const corePath = `M 0 0 L ${Math.sin(-coreHalf) * coreRange} ${-Math.cos(-coreHalf) * coreRange} A ${coreRange} ${coreRange} 0 0 1 ${Math.sin(coreHalf) * coreRange} ${-Math.cos(coreHalf) * coreRange} Z`;
+  // Faisceau : couches de cônes emboîtés (large et faible → étroit et dense). Leur somme donne
+  // une lumière plus dense sur l'axe et qui s'estompe vers les bords, sans arête intérieure.
+  const beamLayers = Array.from({ length: 11 }, (_, index) => {
+    const half = halfBeam * (1 - index * 0.072);
+    const range = beamRange * (1 - index * 0.016);
+    return `M 0 0 L ${Math.sin(-half) * range} ${-Math.cos(-half) * range} A ${range} ${range} 0 0 1 ${Math.sin(half) * range} ${-Math.cos(half) * range} Z`;
+  });
 
   // La puissance (10-100) pilote l'intensité du faisceau ; la lumière reste dans le cadre du faisceau.
   const power = Math.min(1, Math.max(0, item.intensity / 100));
@@ -312,28 +315,34 @@ export const BoardNode = memo(function BoardNode({ item, selected, selectedItems
           className="beam-svg pointer-events-none absolute left-1/2 top-1/2 overflow-visible"
           width="1"
           height="1"
-          style={{ color: item.color, "--p": power } as CSSProperties}
+          style={{ color: item.color }}
         >
           <defs>
             <radialGradient id={`light-grad-${item.id}`} gradientUnits="userSpaceOnUse" cx="0" cy="0" r={Math.max(1, beamRange)}>
-              <stop className="beam-stop-start" offset="0%" stopColor={item.color} stopOpacity={0.14 + 0.66 * power} />
-              <stop className="beam-stop-end" offset="100%" stopColor={item.color} stopOpacity={0.02 + 0.1 * power} />
+              {([[0, 1], [0.3, 0.78], [0.6, 0.46], [0.85, 0.18], [1, 0]] as const).map(([offset, level]) => (
+                <stop
+                  key={offset}
+                  className="beam-stop-color"
+                  offset={`${offset * 100}%`}
+                  stopColor={item.color}
+                  style={{ stopOpacity: `calc(${level} * var(--beam-gain, 1))` }}
+                />
+              ))}
             </radialGradient>
           </defs>
+          {beamLayers.map((d, index) => (
+            <path key={index} d={d} fill={`url(#light-grad-${item.id})`} opacity={0.036 + 0.072 * power} style={{ transition: "opacity 200ms" }} />
+          ))}
+          {/* Cadre du faisceau : trait fin pour repérer l'ouverture et la portée */}
           <path
-            className="beam-path"
             d={lightPath}
-            fill={`url(#light-grad-${item.id})`}
+            fill="none"
             stroke={item.color}
-            strokeOpacity={0.25 + 0.55 * power}
-            strokeWidth="0.8"
-            style={{ transition: "d 180ms" }}
-          />
-          <path
-            className="beam-core"
-            d={corePath}
-            fill={`url(#light-grad-${item.id})`}
-            style={{ opacity: 0.2 + 0.4 * power, transition: "d 180ms, opacity 200ms" }}
+            strokeOpacity={selected ? 0.75 : 0.22 + 0.25 * power}
+            strokeWidth="1"
+            strokeDasharray={selected ? undefined : "5 4"}
+            strokeLinejoin="round"
+            className="beam-outline"
           />
         </svg>
       )}
