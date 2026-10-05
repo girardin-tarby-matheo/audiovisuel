@@ -142,16 +142,20 @@ export const BoardNode = memo(function BoardNode({ item, selected, selectedItems
   const halfBeam = (item.beamSpread / 2) * (Math.PI / 180);
   const lightPath = `M 0 0 L ${Math.sin(-halfBeam) * beamRange} ${-Math.cos(-halfBeam) * beamRange} A ${beamRange} ${beamRange} 0 ${item.beamSpread > 180 ? 1 : 0} 1 ${Math.sin(halfBeam) * beamRange} ${-Math.cos(halfBeam) * beamRange} Z`;
 
-  // Faisceau : couches de cônes emboîtés (large et faible → étroit et dense). Leur somme donne
-  // une lumière plus dense sur l'axe et qui s'estompe vers les bords, sans arête intérieure.
-  const beamLayers = Array.from({ length: 11 }, (_, index) => {
-    const half = halfBeam * (1 - index * 0.072);
-    const range = beamRange * (1 - index * 0.016);
-    return `M 0 0 L ${Math.sin(-half) * range} ${-Math.cos(-half) * range} A ${range} ${range} 0 0 1 ${Math.sin(half) * range} ${-Math.cos(half) * range} Z`;
-  });
-
   // La puissance (10-100) pilote l'intensité du faisceau ; la lumière reste dans le cadre du faisceau.
   const power = Math.min(1, Math.max(0, item.intensity / 100));
+  // Faisceau : un dégradé conique (lumière plus dense dans l'axe) masqué par un dégradé radial (qui
+  // s'estompe avec la distance). Les bords gardent de la lumière : elle remplit tout le cadre.
+  const beamDegrees = Math.min(180, Math.max(6, item.beamSpread));
+  const beamVars = {
+    "--from": `${-beamDegrees / 2}deg`,
+    "--half": `${beamDegrees / 2}deg`,
+    "--full": `${beamDegrees}deg`,
+    "--c-dark": `${Math.round(18 + 60 * power)}%`,
+    "--e-dark": `${Math.round(10 + 34 * power)}%`,
+    "--c-light": `${Math.round(26 + 64 * power)}%`,
+    "--e-light": `${Math.round(14 + 38 * power)}%`,
+  } as CSSProperties;
 
   return (
     <div
@@ -311,40 +315,25 @@ export const BoardNode = memo(function BoardNode({ item, selected, selectedItems
 
       {/* ── Faisceau lumineux : toute la lumière est contenue dans le cône ── */}
       {item.category === "light" && (
-        <svg
-          className="beam-svg pointer-events-none absolute left-1/2 top-1/2 overflow-visible"
-          width="1"
-          height="1"
-          style={{ color: item.color }}
-        >
-          <defs>
-            <radialGradient id={`light-grad-${item.id}`} gradientUnits="userSpaceOnUse" cx="0" cy="0" r={Math.max(1, beamRange)}>
-              {([[0, 1], [0.3, 0.78], [0.6, 0.46], [0.85, 0.18], [1, 0]] as const).map(([offset, level]) => (
-                <stop
-                  key={offset}
-                  className="beam-stop-color"
-                  offset={`${offset * 100}%`}
-                  stopColor={item.color}
-                  style={{ stopOpacity: `calc(${level} * var(--beam-gain, 1))` }}
-                />
-              ))}
-            </radialGradient>
-          </defs>
-          {beamLayers.map((d, index) => (
-            <path key={index} d={d} fill={`url(#light-grad-${item.id})`} opacity={0.036 + 0.072 * power} style={{ transition: "opacity 200ms" }} />
-          ))}
-          {/* Cadre du faisceau : trait fin pour repérer l'ouverture et la portée */}
-          <path
-            d={lightPath}
-            fill="none"
-            stroke={item.color}
-            strokeOpacity={selected ? 0.75 : 0.22 + 0.25 * power}
-            strokeWidth="1"
-            strokeDasharray={selected ? undefined : "5 4"}
-            strokeLinejoin="round"
-            className="beam-outline"
+        <>
+          <div
+            className="beam-cone pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+            style={{ ...beamVars, "--tint": item.color, width: beamRange * 2, height: beamRange * 2, transition: "width 180ms, height 180ms" } as CSSProperties}
           />
-        </svg>
+          {/* Cadre du faisceau : trait fin pour repérer l'ouverture et la portée */}
+          <svg className="beam-svg pointer-events-none absolute left-1/2 top-1/2 overflow-visible" width="1" height="1" style={{ color: item.color }}>
+            <path
+              d={lightPath}
+              fill="none"
+              stroke={item.color}
+              strokeOpacity={selected ? 0.75 : 0.28 + 0.25 * power}
+              strokeWidth="1"
+              strokeDasharray={selected ? undefined : "5 4"}
+              strokeLinejoin="round"
+              className="beam-outline"
+            />
+          </svg>
+        </>
       )}
 
       {/* ── Card body ── */}
