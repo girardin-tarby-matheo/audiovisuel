@@ -104,13 +104,22 @@ export function Sidebar() {
       <div className="scrollbar-thin flex-1 space-y-5 overflow-y-auto px-3 py-4">
         <div className="rounded-xl border border-white/8 bg-white/[0.03] p-3">
           <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Calques</p>
-          <div className="grid grid-cols-2 gap-1.5">
-            {(["video", "audio", "accessories", "lights"] as BoardLayer[]).map((layer) => (
-              <label key={layer} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] text-slate-300 hover:bg-white/5">
-                <input type="checkbox" checked={visibleLayers?.[layer] ?? true} onChange={(event) => setLayerVisibility(layer, event.target.checked)} />
-                {layer === "video" ? "Vidéo" : layer === "audio" ? "Audio" : layer === "accessories" ? "Accessoires" : "Lights"}
-              </label>
-            ))}
+          <div className="flex flex-wrap gap-1.5">
+            {([["video", "Vidéo", "#5eead4"], ["audio", "Audio", "#a78bfa"], ["accessories", "Accessoires", "#94a3b8"], ["lights", "Lights", "#f5b942"]] as Array<[BoardLayer, string, string]>).map(([layer, label, tint]) => {
+              const on = visibleLayers?.[layer] ?? true;
+              return (
+                <button
+                  key={layer}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => setLayerVisibility(layer, !on)}
+                  className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] transition ${on ? "border-white/15 bg-white/[0.07] text-slate-100" : "border-white/6 text-slate-500 line-through hover:text-slate-300"}`}
+                >
+                  <span className="h-2 w-2 rounded-full transition-opacity" style={{ background: tint, opacity: on ? 1 : 0.3 }} />
+                  {label}
+                </button>
+              );
+            })}
           </div>
         </div>
         {CATEGORIES.map((category) => {
@@ -147,7 +156,7 @@ export function Sidebar() {
                       }`}
                     style={{ animationDelay: `${index * 30}ms` }}
                   >
-                    <div className="mb-2 flex h-10 items-center justify-center rounded-lg bg-black/25 transition-colors group-hover:bg-black/35 overflow-hidden relative">
+                    <div className="relative mb-2 flex h-10 items-center justify-center overflow-hidden rounded-lg border border-white/5 transition-colors" style={{ background: `linear-gradient(135deg, ${item.color}26, ${item.color}08)` }}>
                       <VisualAsset
                         visualKey={item.visualKey ?? item.id}
                         image={item.image}
