@@ -585,15 +585,15 @@ export function SynopticBoard() {
         </div>
 
         <div className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-ink-850/90 px-1.5 py-1 shadow-sm backdrop-blur">
-          <span className="rounded-lg bg-violet-100 px-2 py-1 text-[10px] font-semibold text-violet-700">{stats.devices}</span>
+          <span className="rounded-lg bg-violet-400/15 px-2 py-1 text-[10px] font-semibold text-violet-200">{stats.devices}</span>
           <span className="text-[10px] font-medium text-slate-400">Appareils</span>
           <span className="mx-1 h-3 w-px bg-white/10" />
-          <span className="rounded-lg bg-cyan-100 px-2 py-1 text-[10px] font-semibold text-cyan-700">{stats.links}</span>
+          <span className="rounded-lg bg-cyan-400/15 px-2 py-1 text-[10px] font-semibold text-cyan-200">{stats.links}</span>
           <span className="text-[10px] font-medium text-slate-400">Liens</span>
           {stats.issues > 0 && (
             <>
               <span className="mx-1 h-3 w-px bg-white/10" />
-              <span className="rounded-lg bg-[#fef3c7] px-2 py-1 text-[10px] font-semibold text-amber-700">{stats.issues}</span>
+              <span className="rounded-lg bg-amber-400/15 px-2 py-1 text-[10px] font-semibold text-amber-200">{stats.issues}</span>
               <span className="text-[10px] font-medium text-slate-400">Alerte</span>
             </>
           )}
@@ -602,10 +602,10 @@ export function SynopticBoard() {
         <button
           type="button"
           onClick={generateSynoptic}
-          className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-ink-850 px-3 py-2 text-xs font-semibold text-slate-200 shadow-sm transition hover:bg-white/10 hover:text-white active:scale-95"
+          className="btn"
           title="Regénérer le synoptique à partir des caméras et équipements du plan"
         >
-          <RefreshCw size={13} className="text-violet-600" />
+          <RefreshCw size={13} className="text-violet-300" />
           Regénérer
         </button>
 
@@ -671,23 +671,23 @@ export function SynopticBoard() {
             </div>
           )}
         </div>
-        <button type="button" onClick={() => setShowValidation((open) => !open)} className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-ink-850 px-3 py-2 text-xs font-semibold text-slate-200 shadow-sm transition hover:bg-white/10" title="Afficher les erreurs techniques">
-          <AlertTriangle size={13} className="text-amber-600" /> Validation
+        <button type="button" onClick={() => setShowValidation((open) => !open)} className="btn" title="Afficher les erreurs techniques">
+          <AlertTriangle size={13} className="text-amber-300" /> Validation
         </button>
-        <button type="button" onClick={autoLayoutAndFit} className="rounded-xl border border-white/10 bg-ink-850 px-3 py-2 text-xs font-semibold text-slate-200 shadow-sm transition hover:bg-white/10" title="Aligner automatiquement les équipements">Auto-layout</button>
-        {highlightedNodeIds.length > 0 && <button type="button" onClick={clearSignalTrace} className="rounded-xl border border-[#67e8f9] bg-cyan-50 px-3 py-2 text-xs font-semibold text-cyan-700 shadow-sm">Effacer le flux</button>}
+        <button type="button" onClick={autoLayoutAndFit} className="btn" title="Aligner automatiquement les équipements">Auto-layout</button>
+        {highlightedNodeIds.length > 0 && <button type="button" onClick={clearSignalTrace} className="rounded-xl border border-[#67e8f9] bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-200 shadow-sm">Effacer le flux</button>}
       </div>
       {showValidation && <ValidationPanel onClose={() => setShowValidation(false)} />}
       {!isBoardEmpty && (selectedLink || selectedNodeCount > 0) && (
         <div className="synoptic-ui absolute bottom-4 left-4 z-40 flex items-center gap-2 rounded-2xl border border-white/10 bg-ink-850/95 p-2 shadow-xl backdrop-blur">
           <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-            <span className="rounded-lg bg-violet-100 px-2 py-1 text-violet-700">{selectedLink ? "Lien" : `${selectedNodeCount} sel.`}</span>
+            <span className="rounded-lg bg-violet-400/15 px-2 py-1 text-violet-200">{selectedLink ? "Lien" : `${selectedNodeCount} sel.`}</span>
             <span className="text-slate-400">{selectedLink ? "Câble sélectionné" : "Appareils sélectionnés"}</span>
           </div>
           <button
             type="button"
             onClick={removeSelected}
-            className="flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[10px] font-semibold text-red-700 transition hover:bg-red-100"
+            className="flex items-center gap-1 rounded-lg border border-rose-400/30 bg-rose-400/10 px-2 py-1 text-[10px] font-semibold text-rose-200 transition hover:bg-rose-400/20"
           >
             <Trash2 size={12} />
             Supprimer
@@ -740,7 +740,7 @@ export function SynopticBoard() {
           </div>
           <div className="mt-2 flex items-center justify-between gap-6 pt-1.5 border-t border-white/8 text-red-400 font-semibold text-[10px]">
             <span>Besoin d'une alim</span>
-            <div className="flex items-center justify-center h-4 w-4 rounded-full bg-red-100 text-red-400">
+            <div className="flex items-center justify-center h-4 w-4 rounded-full bg-rose-400/15 text-red-400">
               <Zap size={11} fill="currentColor" />
             </div>
           </div>
@@ -797,7 +797,7 @@ export function SynopticBoard() {
       >
         {isBoardEmpty && (
           <div className="absolute left-1/2 top-1/2 z-10 w-[min(520px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-violet-400/30 bg-ink-850/90 p-6 text-center shadow-2xl backdrop-blur-sm">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-100 text-violet-700">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-400/15 text-violet-200">
               <Network size={28} />
             </div>
             <h3 className="mt-4 text-xl font-bold text-slate-100">Le synoptique est vide</h3>
@@ -1066,7 +1066,7 @@ export const DeviceNodeCard = memo(function DeviceNodeCard({
         <button
           type="button"
           onClick={(event) => { event.stopPropagation(); onTrace(); }}
-          className="ml-1 opacity-0 group-hover:opacity-100 p-1 text-cyan-600 hover:text-cyan-800 transition"
+          className="ml-1 opacity-0 group-hover:opacity-100 p-1 text-cyan-400 hover:text-cyan-800 transition"
           title="Tracer le flux du signal"
         >
           <Zap size={12} />
@@ -1126,13 +1126,13 @@ export const DeviceNodeCard = memo(function DeviceNodeCard({
               : <DeviceIllustration deviceType={node.deviceType ?? "generic"} />}
           />
           {node.warningBadge && (
-            <div className="mt-2 flex items-center gap-1 rounded bg-red-100 px-1.5 py-0.5 text-[8.5px] font-bold text-red-700">
+            <div className="mt-2 flex items-center gap-1 rounded bg-rose-400/15 px-1.5 py-0.5 text-[8.5px] font-bold text-rose-200">
               <AlertTriangle size={10} />
               <span>{node.warningBadge}</span>
             </div>
           )}
           {error && (
-            <div className={`mt-2 flex items-center gap-1 rounded px-1.5 py-0.5 text-[8.5px] font-bold ${error.severity === "error" ? "bg-red-100 text-red-700" : "bg-[#fef3c7] text-amber-700"}`}>
+            <div className={`mt-2 flex items-center gap-1 rounded px-1.5 py-0.5 text-[8.5px] font-bold ${error.severity === "error" ? "bg-rose-400/15 text-rose-200" : "bg-amber-400/15 text-amber-200"}`}>
               <AlertTriangle size={10} />
               <span className="truncate">{error.message}</span>
             </div>
@@ -1213,15 +1213,15 @@ function DeviceIllustration({ deviceType }: { deviceType: SynopticDeviceType }) 
         </div>
       );
     case "camera":
-      return <Video size={28} className="text-cyan-600" />;
+      return <Video size={28} className="text-cyan-400" />;
     case "mic":
-      return <Mic size={24} className="text-blue-600" />;
+      return <Mic size={24} className="text-blue-400" />;
     case "screen":
-      return <Tv size={28} className="text-amber-600" />;
+      return <Tv size={28} className="text-amber-300" />;
     case "computer":
-      return <Laptop size={28} className="text-emerald-600" />;
+      return <Laptop size={28} className="text-emerald-400" />;
     case "recorder":
-      return <Disc size={28} className="text-rose-600" />;
+      return <Disc size={28} className="text-rose-400" />;
     case "headphone":
       return <Headphones size={26} className="text-pink-600" />;
     case "di":
