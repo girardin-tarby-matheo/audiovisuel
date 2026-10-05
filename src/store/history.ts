@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import { useStudio } from "./studioStore";
-import type { BoardObject, SynopticLink, SynopticNode } from "../lib/types";
+import type { BoardObject, PlanBackground, SynopticLink, SynopticNode } from "../lib/types";
 
-type Snapshot = { items: BoardObject[]; synopticNodes: SynopticNode[]; synopticLinks: SynopticLink[] };
+type Snapshot = { items: BoardObject[]; synopticNodes: SynopticNode[]; synopticLinks: SynopticLink[]; planBackground: PlanBackground | null };
 
 const MAX_HISTORY = 100;
 // Les changements rapprochés (drag, saisie) sont fusionnés en une seule étape d'historique.
@@ -16,14 +16,14 @@ let burstTimer: number | undefined;
 export const useHistory = create<{ canUndo: boolean; canRedo: boolean }>(() => ({ canUndo: false, canRedo: false }));
 
 const sync = () => useHistory.setState({ canUndo: past.length > 0, canRedo: future.length > 0 });
-const snapshot = (state: Snapshot): Snapshot => ({ items: state.items, synopticNodes: state.synopticNodes, synopticLinks: state.synopticLinks });
+const snapshot = (state: Snapshot): Snapshot => ({ items: state.items, synopticNodes: state.synopticNodes, synopticLinks: state.synopticLinks, planBackground: state.planBackground });
 
 function apply(target: Snapshot) {
   applying = true;
   const { selectedIds } = useStudio.getState();
   const ids = new Set(target.items.map((item) => item.id));
   const kept = selectedIds.filter((id) => ids.has(id));
-  useStudio.setState({ ...target, selectedIds: kept, selectedId: kept[kept.length - 1] ?? null, highlightedNodeIds: [], highlightedLinkIds: [] });
+  useStudio.setState({ ...target, planBackgroundEditing: false, selectedIds: kept, selectedId: kept[kept.length - 1] ?? null, highlightedNodeIds: [], highlightedLinkIds: [] });
   applying = false;
   window.clearTimeout(burstTimer);
   burstTimer = undefined;
@@ -48,7 +48,7 @@ export function redo() {
 if (typeof window !== "undefined") {
   useStudio.subscribe((state, prev) => {
     if (applying) return;
-    if (state.items === prev.items && state.synopticNodes === prev.synopticNodes && state.synopticLinks === prev.synopticLinks) return;
+    if (state.items === prev.items && state.synopticNodes === prev.synopticNodes && state.synopticLinks === prev.synopticLinks && state.planBackground === prev.planBackground) return;
     if (burstTimer === undefined) {
       past.push(snapshot(prev));
       if (past.length > MAX_HISTORY) past.shift();
