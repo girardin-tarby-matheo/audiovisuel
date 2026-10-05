@@ -366,6 +366,15 @@ export function CanvasBoard() {
           />
         )}
 
+        {items.length === 0 && !isDragOver && (
+          <div className="no-export pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="rounded-3xl border border-dashed border-white/15 bg-surface/70 px-8 py-6 text-center backdrop-blur-sm">
+              <p className="text-sm font-semibold text-slate-100">Le plateau est vide</p>
+              <p className="mt-1 text-xs text-slate-400">Glissez un élément depuis la bibliothèque, ou cliquez dessus pour le poser au centre.</p>
+            </div>
+          </div>
+        )}
+
         {/* Drop zone hint */}
         {isDragOver && (
           <div className="no-export pointer-events-none absolute inset-0 flex items-center justify-center">

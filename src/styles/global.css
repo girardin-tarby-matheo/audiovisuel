@@ -663,7 +663,7 @@ html[data-theme="light"] .item-label {
 html[data-theme="light"] .beam-stop-start,
 html[data-theme="light"] .beam-stop-end { stop-color: color-mix(in srgb, currentColor 78%, #0f172a); }
 
-html[data-theme="light"] .beam-stop-start { stop-opacity: calc(0.14 + 0.62 * var(--p, 0.6)); }
+html[data-theme="light"] .beam-stop-start { stop-opacity: calc(0.2 + 0.7 * var(--p, 0.6)); }
 html[data-theme="light"] .beam-stop-end { stop-opacity: calc(0.04 + 0.16 * var(--p, 0.6)); }
 
 html[data-theme="light"] .beam-path {

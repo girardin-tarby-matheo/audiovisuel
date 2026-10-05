@@ -6,6 +6,7 @@ import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { CatalogManagerModal } from "./CatalogManagerModal";
 import { ProjectManagerModal } from "./ProjectManagerModal";
+import { ShortcutsDialog } from "./ShortcutsDialog";
 import { useStudio } from "../store/studioStore";
 import { undo, redo } from "../store/history";
 import { GRID_SIZE } from "../lib/constants";
@@ -111,6 +112,7 @@ export default function StudioApp() {
   const viewMode = useStudio((s) => s.viewMode);
   const [showWelcome, setShowWelcome] = useState(false);
   const [showProjects, setShowProjects] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
   const [narrow, setNarrow] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(true);
   const [propertiesOpen, setPropertiesOpen] = useState(true);
@@ -146,6 +148,11 @@ export default function StudioApp() {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable) return;
+      if (event.key === "?" ) {
+        event.preventDefault();
+        setShowShortcuts((open) => !open);
+        return;
+      }
       const mod = event.ctrlKey || event.metaKey;
       const key = event.key.toLowerCase();
       const state = useStudio.getState();
@@ -184,6 +191,7 @@ export default function StudioApp() {
     <div className="flex h-full min-h-screen flex-col bg-ink-950 text-slate-100">
       <TopBar
         onOpenProjects={() => setShowProjects(true)}
+        onOpenShortcuts={() => setShowShortcuts(true)}
         panels={viewMode === "plan" ? { library: libraryOpen, properties: propertiesOpen, onToggleLibrary: () => setLibraryOpen((open) => !open), onToggleProperties: () => setPropertiesOpen((open) => !open) } : undefined}
       />
       <div className="relative flex min-h-0 flex-1">
@@ -199,6 +207,7 @@ export default function StudioApp() {
       </div>
       <CatalogManagerModal />
       {showProjects && <ProjectManagerModal onClose={() => setShowProjects(false)} />}
+      {showShortcuts && <ShortcutsDialog onClose={() => setShowShortcuts(false)} />}
       {toast && <ToastBar message={toast} onDismiss={() => setToast(null)} />}
       {showWelcome && <WelcomeOverlay onDismiss={dismissWelcome} />}
     </div>

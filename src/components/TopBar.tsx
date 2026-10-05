@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { Download, Share2, Clapperboard, RotateCcw, Loader2, Check, LayoutDashboard, Network, FolderOpen, Undo2, Redo2, Sun, Moon, PanelLeft, PanelRight } from "lucide-react";
+import { Download, Share2, Clapperboard, RotateCcw, Loader2, Check, LayoutDashboard, Network, FolderOpen, Undo2, Redo2, Sun, Moon, PanelLeft, PanelRight, Keyboard } from "lucide-react";
 import { toPng } from "html-to-image";
 import { useStudio } from "../store/studioStore";
 import { useHistory, undo, redo } from "../store/history";
@@ -8,7 +8,7 @@ type ActionState = "idle" | "busy" | "done";
 
 type PanelControls = { library: boolean; properties: boolean; onToggleLibrary: () => void; onToggleProperties: () => void };
 
-export function TopBar({ onOpenProjects, panels }: { onOpenProjects: () => void; panels?: PanelControls }) {
+export function TopBar({ onOpenProjects, onOpenShortcuts, panels }: { onOpenProjects: () => void; onOpenShortcuts?: () => void; panels?: PanelControls }) {
   const title = useStudio((s) => s.title);
   const viewMode = useStudio((s) => s.viewMode);
   const synopticNodes = useStudio((s) => s.synopticNodes);
@@ -146,6 +146,12 @@ export function TopBar({ onOpenProjects, panels }: { onOpenProjects: () => void;
         {panels && (
           <button type="button" onClick={panels.onToggleProperties} aria-pressed={panels.properties} title="Afficher / masquer les propriétés" aria-label="Afficher ou masquer les propriétés" className={`rounded-xl border border-white/8 p-2 transition hover:bg-white/8 hover:text-white ${panels.properties ? "text-amber-200" : "text-slate-400"}`}>
             <PanelRight size={16} />
+          </button>
+        )}
+
+        {onOpenShortcuts && (
+          <button type="button" onClick={onOpenShortcuts} title="Raccourcis clavier (?)" aria-label="Raccourcis clavier" className="hidden rounded-xl border border-white/8 p-2 text-slate-400 transition hover:bg-white/8 hover:text-white lg:block">
+            <Keyboard size={16} />
           </button>
         )}
 
