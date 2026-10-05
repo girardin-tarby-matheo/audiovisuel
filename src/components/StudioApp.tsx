@@ -111,6 +111,27 @@ export default function StudioApp() {
   const viewMode = useStudio((s) => s.viewMode);
   const [showWelcome, setShowWelcome] = useState(false);
   const [showProjects, setShowProjects] = useState(false);
+  const [narrow, setNarrow] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(true);
+  const [propertiesOpen, setPropertiesOpen] = useState(true);
+
+  // Écrans étroits : les panneaux latéraux passent en superposition, fermés par défaut.
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 1099px)");
+    const apply = () => {
+      setNarrow(query.matches);
+      if (query.matches) {
+        setLibraryOpen(false);
+        setPropertiesOpen(false);
+      } else {
+        setLibraryOpen(true);
+        setPropertiesOpen(true);
+      }
+    };
+    apply();
+    query.addEventListener("change", apply);
+    return () => query.removeEventListener("change", apply);
+  }, []);
 
   useEffect(() => {
     try {
@@ -161,13 +182,16 @@ export default function StudioApp() {
 
   return (
     <div className="flex h-full min-h-screen flex-col bg-ink-950 text-slate-100">
-      <TopBar onOpenProjects={() => setShowProjects(true)} />
-      <div className="flex min-h-0 flex-1">
+      <TopBar
+        onOpenProjects={() => setShowProjects(true)}
+        panels={viewMode === "plan" ? { library: libraryOpen, properties: propertiesOpen, onToggleLibrary: () => setLibraryOpen((open) => !open), onToggleProperties: () => setPropertiesOpen((open) => !open) } : undefined}
+      />
+      <div className="relative flex min-h-0 flex-1">
         {viewMode === "plan" ? (
           <>
-            <Sidebar />
+            {libraryOpen && <div className={narrow ? "absolute inset-y-0 left-0 z-40 flex shadow-2xl" : "flex"}><Sidebar /></div>}
             <CanvasBoard />
-            <PropertiesPanel />
+            {propertiesOpen && <div className={narrow ? "absolute inset-y-0 right-0 z-40 flex shadow-2xl" : "flex"}><PropertiesPanel /></div>}
           </>
         ) : (
           <SynopticBoard />

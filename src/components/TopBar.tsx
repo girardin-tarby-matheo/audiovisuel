@@ -1,12 +1,14 @@
 import { useState, useCallback, useEffect } from "react";
-import { Download, Share2, Clapperboard, RotateCcw, Loader2, Check, LayoutDashboard, Network, FolderOpen, Undo2, Redo2, Sun, Moon } from "lucide-react";
+import { Download, Share2, Clapperboard, RotateCcw, Loader2, Check, LayoutDashboard, Network, FolderOpen, Undo2, Redo2, Sun, Moon, PanelLeft, PanelRight } from "lucide-react";
 import { toPng } from "html-to-image";
 import { useStudio } from "../store/studioStore";
 import { useHistory, undo, redo } from "../store/history";
 
 type ActionState = "idle" | "busy" | "done";
 
-export function TopBar({ onOpenProjects }: { onOpenProjects: () => void }) {
+type PanelControls = { library: boolean; properties: boolean; onToggleLibrary: () => void; onToggleProperties: () => void };
+
+export function TopBar({ onOpenProjects, panels }: { onOpenProjects: () => void; panels?: PanelControls }) {
   const title = useStudio((s) => s.title);
   const viewMode = useStudio((s) => s.viewMode);
   const synopticNodes = useStudio((s) => s.synopticNodes);
@@ -93,21 +95,26 @@ export function TopBar({ onOpenProjects }: { onOpenProjects: () => void }) {
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between gap-2 whitespace-nowrap border-b border-white/6 bg-chrome/95 px-4">
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-amber-300/20 to-cyan-300/10 text-amber-200 transition-transform hover:scale-105">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        {panels && (
+          <button type="button" onClick={panels.onToggleLibrary} aria-pressed={panels.library} title="Afficher / masquer la bibliothèque" aria-label="Afficher ou masquer la bibliothèque" className={`rounded-xl border border-white/8 p-2 transition hover:bg-white/8 hover:text-white ${panels.library ? "text-amber-200" : "text-slate-400"}`}>
+            <PanelLeft size={16} />
+          </button>
+        )}
+        <div className="hidden h-9 w-9 shrink-0 items-center md:flex justify-center rounded-xl bg-gradient-to-br from-amber-300/20 to-cyan-300/10 text-amber-200 transition-transform hover:scale-105">
           <Clapperboard size={18} />
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Shotboard Studio</p>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-[min(420px,30vw)] truncate bg-transparent text-[15px] font-semibold text-white outline-none transition-colors focus:text-amber-100"
+            className="w-full max-w-[420px] min-w-[6rem] truncate bg-transparent text-[15px] font-semibold text-white outline-none transition-colors focus:text-amber-100"
           />
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         <div className="tooltip-trigger">
           <span className="hidden cursor-default text-[11px] text-slate-500 md:inline">
             {items.length} objet{items.length !== 1 ? "s" : ""}
@@ -135,6 +142,12 @@ export function TopBar({ onOpenProjects }: { onOpenProjects: () => void }) {
             <Redo2 size={15} />
           </button>
         </div>
+
+        {panels && (
+          <button type="button" onClick={panels.onToggleProperties} aria-pressed={panels.properties} title="Afficher / masquer les propriétés" aria-label="Afficher ou masquer les propriétés" className={`rounded-xl border border-white/8 p-2 transition hover:bg-white/8 hover:text-white ${panels.properties ? "text-amber-200" : "text-slate-400"}`}>
+            <PanelRight size={16} />
+          </button>
+        )}
 
         <button
           type="button"
