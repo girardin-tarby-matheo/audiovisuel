@@ -271,18 +271,19 @@ export const BoardNode = memo(function BoardNode({ item, selected, selectedItems
       {/* ── Camera FOV cone ── */}
       {item.category === "camera" && (
         <svg
-          className="pointer-events-none absolute left-1/2 top-1/2 overflow-visible"
+          className="beam-svg pointer-events-none absolute left-1/2 top-1/2 overflow-visible"
           width="1"
           height="1"
-          style={{ opacity: selected ? 0.95 : 0.72, transition: "opacity 200ms" }}
+          style={{ color: item.color, opacity: selected ? 0.95 : 0.72, transition: "opacity 200ms" }}
         >
           <defs>
             <linearGradient id={`cam-grad-${item.id}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={item.color} stopOpacity="0.25" />
-              <stop offset="100%" stopColor={item.color} stopOpacity="0.03" />
+              <stop className="beam-stop-start" offset="0%" stopColor={item.color} stopOpacity="0.25" />
+              <stop className="beam-stop-end" offset="100%" stopColor={item.color} stopOpacity="0.03" />
             </linearGradient>
           </defs>
           <path
+            className="beam-path"
             d={camPath}
             fill={`url(#cam-grad-${item.id})`}
             stroke={`${item.color}88`}
@@ -306,9 +307,10 @@ export const BoardNode = memo(function BoardNode({ item, selected, selectedItems
         <>
           {/* Radial glow */}
           <div
-            className={`pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full ${selected ? "animate-glow-pulse" : ""
+            className={`beam-glow pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full ${selected ? "animate-glow-pulse" : ""
               }`}
             style={{
+              color: item.color,
               width: item.beamRadius * 1.15 * item.scale,
               height: item.beamRadius * 1.15 * item.scale,
               background: `radial-gradient(circle, ${item.color}${glowAlpha} 0%, ${item.color}00 72%)`,
@@ -318,17 +320,19 @@ export const BoardNode = memo(function BoardNode({ item, selected, selectedItems
           />
           {/* Beam cone */}
           <svg
-            className="pointer-events-none absolute left-1/2 top-1/2 overflow-visible"
+            className="beam-svg pointer-events-none absolute left-1/2 top-1/2 overflow-visible"
             width="1"
             height="1"
+            style={{ color: item.color }}
           >
             <defs>
               <radialGradient id={`light-grad-${item.id}`}>
-                <stop offset="0%" stopColor={item.color} stopOpacity="0.3" />
-                <stop offset="100%" stopColor={item.color} stopOpacity="0.04" />
+                <stop className="beam-stop-start" offset="0%" stopColor={item.color} stopOpacity="0.3" />
+                <stop className="beam-stop-end" offset="100%" stopColor={item.color} stopOpacity="0.04" />
               </radialGradient>
             </defs>
             <path
+              className="beam-path"
               d={lightPath}
               fill={`url(#light-grad-${item.id})`}
               stroke={`${item.color}55`}
