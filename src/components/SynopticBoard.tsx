@@ -22,6 +22,7 @@ import { ValidationPanel } from "./ValidationPanel";
 import { CABLE_COLORS } from "../lib/constants";
 import { validateSynoptic } from "../lib/validation";
 import { synopticNodeWidth } from "../lib/synopticLayout";
+import { directedKey, linkGeometry, orient, pickPortOnNode, validTargets, type PortDirection } from "../lib/synopticLinks";
 import type { CableType, SynopticDeviceType, SynopticNode, SynopticPort } from "../lib/types";
 
 
@@ -49,14 +50,14 @@ type MarqueeState = {
 type LinkingState = {
   fromNodeId: string;
   fromPortId: string;
+  /** Sens du port de départ : on peut tirer un câble depuis une sortie comme depuis une entrée. */
+  direction: PortDirection;
   cableType: CableType;
   startX: number;
   startY: number;
   currentX: number;
   currentY: number;
 };
-
-const CABLE_TYPES: CableType[] = ["hdmi", "sdi", "xlr", "jack", "usb"];
 
 export function SynopticBoard() {
   const nodesMap = useStudio((state) => state.synopticNodes);
@@ -118,9 +119,9 @@ export function SynopticBoard() {
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
   const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null);
+  const [hoveredLinkId, setHoveredLinkId] = useState<string | null>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [portCoordinates, setPortCoordinates] = useState<Map<string, { x: number; y: number }>>(new Map());
-  const repairedCanonicalLinksRef = useRef(false);
   const [marquee, setMarquee] = useState<{ startX: number; startY: number; x: number; y: number } | null>(null);
   const [showValidation, setShowValidation] = useState(false);
   // La légende masque la barre d'outils sur les écrans moyens : ouverte seulement sur grand écran.
@@ -129,6 +130,22 @@ export function SynopticBoard() {
     setShowLegend(window.matchMedia("(min-width: 1500px)").matches);
   }, []);
   const selectedLink = useMemo(() => links.find((link) => link.id === selectedLinkId) ?? null, [links, selectedLinkId]);
+  // Ports déjà reliés (pour les remplir) et ports pouvant recevoir le câble en cours de tracé (pour les mettre en évidence).
+  const connectedKeys = useMemo(() => {
+    const keys = new Set<string>();
+    links.forEach((link) => {
+      if (link.fromPortId) keys.add(directedKey(link.fromNodeId, "out", link.fromPortId));
+      if (link.toPortId) keys.add(directedKey(link.toNodeId, "in", link.toPortId));
+    });
+    return keys;
+  }, [links]);
+  const linkSourceKey = linking ? directedKey(linking.fromNodeId, linking.direction, linking.fromPortId) : null;
+  const linkTargets = useMemo(
+    () => (linking ? validTargets(nodes, links, { nodeId: linking.fromNodeId, portId: linking.fromPortId, direction: linking.direction }) : null),
+    // Le curseur bouge à chaque mouvement : seules les extrémités du câble déterminent les cibles.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [linking?.fromNodeId, linking?.fromPortId, linking?.direction, nodes, links],
+  );
   const isBoardEmpty = nodes.length === 0;
   const selectedNodeCount = selectedNodeIds.length;
   const stats = useMemo(() => ({
@@ -168,22 +185,6 @@ export function SynopticBoard() {
   }, [selectedLinkId]);
 
   useEffect(() => {
-    if (repairedCanonicalLinksRef.current) return;
-    if (!nodes.length) return;
-    const hyperDeck = nodes.find((node) => node.sourceId === null && node.deviceType === "recorder" && node.title.startsWith("HyperDeck"));
-    const masterScreen = nodes.find((node) => node.sourceId === null && node.deviceType === "screen" && node.title === "Ecran Moniteur");
-    const hasHyperDeckLink = hyperDeck && masterScreen && links.some((link) => link.fromNodeId === hyperDeck.id && link.toNodeId === masterScreen.id);
-    if (hyperDeck && masterScreen && !hasHyperDeckLink) {
-      const fromPort = hyperDeck.portsOut.find((port) => port.id === "hdmi-out") ?? hyperDeck.portsOut.find((port) => port.type === "hdmi");
-      const toPort = masterScreen.portsIn.find((port) => port.id === "hdmi-in") ?? masterScreen.portsIn.find((port) => port.type === "hdmi");
-      if (fromPort && toPort) {
-        addSynopticLink(hyperDeck.id, masterScreen.id, fromPort.id, toPort.id, "hdmi");
-      }
-    }
-    repairedCanonicalLinksRef.current = true;
-  }, [addSynopticLink, links, nodes]);
-
-  useEffect(() => {
     const closeAddMenu = (event: PointerEvent) => {
       const target = event.target as HTMLElement | null;
       if (target?.closest(".synoptic-ui")) return;
@@ -206,6 +207,7 @@ export function SynopticBoard() {
       }
 
       if (event.key === "Escape") {
+        setLinking(null);
         setSelectedLinkId(null);
         setSelectedNodeIds([]);
       }
@@ -424,6 +426,15 @@ export function SynopticBoard() {
       }
     }
     if (linking) {
+      // Dépôt sur une carte (hors d'un port précis) : on branche sur le premier port compatible.
+      const target = e.target as HTMLElement;
+      const card = target.closest<HTMLElement>("[data-synoptic-card]");
+      if (card && !target.closest(".port-handle")) {
+        const cardId = card.dataset.synopticCard ?? "";
+        const portId = pickPortOnNode(nodes, links, { nodeId: linking.fromNodeId, portId: linking.fromPortId, direction: linking.direction }, cardId);
+        if (portId) finishLinking(cardId, portId);
+        else if (cardId !== linking.fromNodeId) setToast("Aucun port compatible sur cet appareil");
+      }
       setLinking(null);
     }
   };
@@ -451,41 +462,47 @@ export function SynopticBoard() {
     }
   };
 
-  // Démarrer une liaison depuis un port OUT
-  const startLinking = (node: SynopticNode, port: SynopticPort, e: React.PointerEvent) => {
+  // Démarrer un câble depuis un port (sortie ou entrée) : l'aperçu part du centre du port.
+  const startLinking = (node: SynopticNode, port: SynopticPort, direction: PortDirection, e: React.PointerEvent) => {
     e.stopPropagation();
     e.preventDefault();
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
-
-    const startX = (e.clientX - rect.left - pan.x) / zoom;
-    const startY = (e.clientY - rect.top - pan.y) / zoom;
-
+    const anchor = getPortCoordinates(node.id, port.id, direction === "out") ?? {
+      x: (e.clientX - rect.left - pan.x) / zoom,
+      y: (e.clientY - rect.top - pan.y) / zoom,
+    };
+    setSelectedLinkId(null);
     setLinking({
       fromNodeId: node.id,
       fromPortId: port.id,
+      direction,
       cableType: port.type,
-      startX,
-      startY,
-      currentX: startX,
-      currentY: startY,
+      startX: anchor.x,
+      startY: anchor.y,
+      currentX: (e.clientX - rect.left - pan.x) / zoom,
+      currentY: (e.clientY - rect.top - pan.y) / zoom,
     });
   };
 
-  // Terminer la liaison sur un port IN
-  const completeLinking = (node: SynopticNode, port: SynopticPort, e: React.PointerEvent) => {
+  // Relie le port de départ à un port cible : le store applique les règles (types, source unique, doublons).
+  const finishLinking = (targetNodeId: string, targetPortId: string) => {
+    if (!linking) return;
+    const { from, to } = orient({ nodeId: linking.fromNodeId, portId: linking.fromPortId, direction: linking.direction }, { nodeId: targetNodeId, portId: targetPortId });
+    addSynopticLink(from.nodeId, to.nodeId, from.portId, to.portId);
+    setLinking(null);
+  };
+
+  // Terminer le câble sur un port : il doit être de l'autre sens (sortie ↔ entrée).
+  const completeLinking = (node: SynopticNode, port: SynopticPort, direction: PortDirection, e: React.PointerEvent) => {
     e.stopPropagation();
     if (!linking) return;
-
-    if (linking.fromNodeId === node.id) {
-      setToast("Impossible de relier un appareil à lui-même");
+    if (direction === linking.direction) {
+      setToast(direction === "out" ? "Une sortie se relie à une entrée" : "Une entrée se relie à une sortie");
       setLinking(null);
       return;
     }
-
-    addSynopticLink(linking.fromNodeId, node.id, linking.fromPortId, port.id, linking.cableType);
-    setToast(`Liaison ${linking.cableType.toUpperCase()} créée ✓`);
-    setLinking(null);
+    finishLinking(node.id, port.id);
   };
 
   const nodeMap = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
@@ -727,25 +744,39 @@ export function SynopticBoard() {
           </button>
         </div>
       )}
-      {selectedLink && (
-        <div className="link-editor-popup synoptic-ui absolute bottom-4 left-4 z-40 w-64 rounded-xl border border-white/10 bg-ink-850 p-3 shadow-xl">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Lien sélectionné</p>
-            <button type="button" onClick={() => setSelectedLinkId(null)} className="text-xs text-slate-400 hover:text-white" aria-label="Fermer l’édition du lien">Fermer</button>
+      {selectedLink && (() => {
+        const fromNode = nodeMap.get(selectedLink.fromNodeId);
+        const toNode = nodeMap.get(selectedLink.toNodeId);
+        const fromPort = fromNode?.portsOut.find((port) => port.id === selectedLink.fromPortId);
+        const toPort = toNode?.portsIn.find((port) => port.id === selectedLink.toPortId);
+        const cableCfg = CABLE_COLORS[selectedLink.cableType] || CABLE_COLORS.hdmi;
+        return (
+          <div className="link-editor-popup synoptic-ui absolute bottom-4 left-4 z-40 w-72 rounded-xl border border-white/10 bg-ink-850 p-3 shadow-xl">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Liaison sélectionnée</p>
+              <button type="button" onClick={() => setSelectedLinkId(null)} className="text-xs text-slate-400 hover:text-white" aria-label="Fermer l’édition du lien">Fermer</button>
+            </div>
+            <div className="mb-3 rounded-lg border border-white/8 bg-white/[0.04] p-2 text-[11px] leading-snug text-slate-200">
+              <p className="font-semibold">{fromNode?.title ?? "Appareil supprimé"}</p>
+              <p className="text-slate-400">{fromPort?.name ?? "—"} · sortie</p>
+              <div className="my-1.5 flex items-center gap-2">
+                <span className="h-px flex-1" style={{ background: cableCfg.color }} />
+                <span className="rounded px-1.5 py-0.5 font-mono text-[9px] font-bold text-[#fff]" style={{ background: cableCfg.color }}>{cableCfg.label}</span>
+                <span className="h-px flex-1" style={{ background: cableCfg.color }} />
+              </div>
+              <p className="font-semibold">{toNode?.title ?? "Appareil supprimé"}</p>
+              <p className="text-slate-400">{toPort?.name ?? "—"} · entrée</p>
+            </div>
+            <label className="block text-[10px] font-semibold uppercase text-slate-400">
+              Libellé
+              <input value={selectedLink.label ?? ""} onChange={(event) => updateSynopticLink(selectedLink.id, { label: event.target.value || undefined })} placeholder="Ex. Caméra 1 → ATEM" className="field mt-1 py-1.5 text-xs" />
+            </label>
+            <button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.preventDefault(); event.stopPropagation(); removeSynopticLink(selectedLink.id); setSelectedLinkId(null); setToast("Liaison supprimée"); }} className="btn btn-danger mt-3 w-full">
+              <Trash2 size={13} /> Supprimer la liaison
+            </button>
           </div>
-          <label className="mb-2 block text-[10px] font-semibold uppercase text-slate-400">
-            Type de prise
-            <select value={selectedLink.cableType} onChange={(event) => updateSynopticLink(selectedLink.id, { cableType: event.target.value as CableType })} className="mt-1 w-full rounded-lg border border-white/10 bg-ink-850 px-2 py-1.5 text-xs text-slate-200">
-              {CABLE_TYPES.map((type) => <option key={type} value={type}>{CABLE_COLORS[type].label}</option>)}
-            </select>
-          </label>
-          <label className="block text-[10px] font-semibold uppercase text-slate-400">
-            Libellé
-            <input value={selectedLink.label ?? ""} onChange={(event) => updateSynopticLink(selectedLink.id, { label: event.target.value || undefined })} placeholder="Ex. Caméra 1 → ATEM" className="mt-1 w-full rounded-lg border border-white/10 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-violet-500" />
-          </label>
-          <button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.preventDefault(); event.stopPropagation(); removeSynopticLink(selectedLink.id); setSelectedLinkId(null); }} className="mt-3 flex w-full items-center justify-center rounded-lg bg-red-600 px-2 py-1.5 text-xs font-semibold text-[#fff] hover:bg-red-700">Supprimer le lien</button>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Légende des câbles : repliable */}
       {!showLegend && (
@@ -881,12 +912,13 @@ export function SynopticBoard() {
 
               const cableCfg = CABLE_COLORS[link.cableType] || CABLE_COLORS.hdmi;
               const isSelected = selectedLinkId === link.id;
+              const isHovered = hoveredLinkId === link.id;
               const label = link.label?.trim();
-
-              // Trajectoire Bézier fluide horizontale
-              const dx = Math.abs(end.x - start.x) * 0.5;
-              const pathD = `M ${start.x} ${start.y} C ${start.x + Math.max(40, dx)} ${start.y}, ${end.x - Math.max(40, dx)
-                } ${end.y}, ${end.x} ${end.y}`;
+              const { d: pathD, mid } = linkGeometry(start, end);
+              const fromNode = nodeMap.get(link.fromNodeId);
+              const toNode = nodeMap.get(link.toNodeId);
+              const fromPort = fromNode?.portsOut.find((port) => port.id === link.fromPortId);
+              const toPort = toNode?.portsIn.find((port) => port.id === link.toPortId);
 
               return (
                 <g
@@ -894,47 +926,24 @@ export function SynopticBoard() {
                   className="synoptic-link pointer-events-auto cursor-pointer"
                   onPointerDown={(event) => { event.stopPropagation(); setSelectedLinkId(link.id); }}
                   onClick={(event) => { event.stopPropagation(); setSelectedLinkId(link.id); }}
+                  onPointerEnter={() => setHoveredLinkId(link.id)}
+                  onPointerLeave={() => setHoveredLinkId((current) => (current === link.id ? null : current))}
                   opacity={highlightedLinkIds.length === 0 || highlightedLinkIds.includes(link.id) ? 1 : 0.18}
                 >
+                  <title>{`${fromNode?.title ?? "?"} · ${fromPort?.name ?? ""} → ${toNode?.title ?? "?"} · ${toPort?.name ?? ""}`}</title>
                   <path d={pathD} fill="none" stroke="transparent" strokeWidth="18" strokeLinecap="round" pointerEvents="stroke" />
-                  {/* Contour de sélection */}
-                  {isSelected && (
-                    <path
-                      d={pathD}
-                      fill="none"
-                      stroke="#8b5cf6"
-                      strokeWidth="8"
-                      strokeOpacity="0.4"
-                      strokeLinecap="round"
-                    />
+                  {(isSelected || isHovered) && (
+                    <path d={pathD} fill="none" stroke={isSelected ? "#8b5cf6" : cableCfg.color} strokeWidth="9" strokeOpacity={isSelected ? 0.4 : 0.25} strokeLinecap="round" />
                   )}
-                  {/* Ombre portée : un second tracé décalé. Un filtre SVG ferait disparaître les câbles
-                      parfaitement horizontaux (boîte englobante de hauteur nulle). */}
-                  <path
-                    d={pathD}
-                    fill="none"
-                    stroke="#000"
-                    strokeOpacity="0.22"
-                    strokeWidth={isSelected ? "5.5" : "4.5"}
-                    strokeLinecap="round"
-                    transform="translate(0 2)"
-                  />
-                  {/* Câble principal */}
-                  <path
-                    d={pathD}
-                    fill="none"
-                    stroke={cableCfg.color}
-                    strokeWidth={isSelected ? "4.5" : "3.5"}
-                    strokeLinecap="round"
-                  />
-                  {/* Point de connexion de départ */}
+                  {/* Ombre portée : un second tracé décalé (un filtre SVG ferait disparaître les câbles horizontaux). */}
+                  <path d={pathD} fill="none" stroke="#000" strokeOpacity="0.22" strokeWidth={isSelected ? 5.5 : 4.5} strokeLinecap="round" transform="translate(0 2)" />
+                  <path d={pathD} fill="none" stroke={cableCfg.color} strokeWidth={isSelected ? 4.5 : isHovered ? 4 : 3.5} strokeLinecap="round" />
                   <circle cx={start.x} cy={start.y} r="4" fill={cableCfg.color} />
-                  {/* Point de connexion d'arrivée */}
                   <circle cx={end.x} cy={end.y} r="4" fill={cableCfg.color} />
                   {label && (
                     <g pointerEvents="none">
-                      <rect x={(start.x + end.x) / 2 - Math.min(label.length * 3.2, 90)} y={(start.y + end.y) / 2 - 12} width={Math.min(label.length * 6.4 + 12, 192)} height="18" rx="5" fill="white" fillOpacity="0.94" stroke={cableCfg.color} strokeOpacity="0.35" />
-                      <text x={(start.x + end.x) / 2} y={(start.y + end.y) / 2 + 1} textAnchor="middle" fontSize="10" fontWeight="600" fill="#334155">{label.slice(0, 28)}</text>
+                      <rect x={mid.x - Math.min(label.length * 3.1 + 7, 95)} y={mid.y - 10} width={Math.min(label.length * 6.2 + 14, 190)} height="18" rx="5" fill="#fff" stroke={cableCfg.color} strokeWidth="1" />
+                      <text x={mid.x} y={mid.y + 3} textAnchor="middle" fontSize="10" fontWeight="600" fill="#334155">{label.slice(0, 28)}</text>
                     </g>
                   )}
                 </g>
@@ -942,17 +951,18 @@ export function SynopticBoard() {
             })}
 
             {/* Câble en cours de tracé */}
-            {linking && (
-              <path
-                d={`M ${linking.startX} ${linking.startY} C ${linking.startX + 60} ${linking.startY}, ${linking.currentX - 60
-                  } ${linking.currentY}, ${linking.currentX} ${linking.currentY}`}
-                fill="none"
-                stroke={CABLE_COLORS[linking.cableType]?.color || "#f97316"}
-                strokeWidth="2.5"
-                strokeDasharray="6 4"
-                strokeLinecap="round"
-              />
-            )}
+            {linking && (() => {
+              const anchor = { x: linking.startX, y: linking.startY };
+              const cursor = { x: linking.currentX, y: linking.currentY };
+              const { d } = linking.direction === "out" ? linkGeometry(anchor, cursor) : linkGeometry(cursor, anchor);
+              const color = CABLE_COLORS[linking.cableType]?.color || "#f97316";
+              return (
+                <>
+                  <path d={d} fill="none" stroke={color} strokeWidth="3" strokeDasharray="7 5" strokeLinecap="round" opacity="0.9" />
+                  <circle cx={cursor.x} cy={cursor.y} r="5" fill={color} opacity="0.9" />
+                </>
+              );
+            })()}
           </svg>
 
           {/* Bouton de suppression de câble sélectionné */}
@@ -964,8 +974,9 @@ export function SynopticBoard() {
                 const start = getPortCoordinates(link.fromNodeId, link.fromPortId, true, link.cableType);
                 const end = getPortCoordinates(link.toNodeId, link.toPortId, false, link.cableType);
                 if (!start || !end) return null;
-                const midX = (start.x + end.x) / 2;
-                const midY = (start.y + end.y) / 2;
+                const { mid } = linkGeometry(start, end);
+                const midX = mid.x;
+                const midY = mid.y;
                 return (
                   <button
                     type="button"
@@ -1002,6 +1013,9 @@ export function SynopticBoard() {
               onTogglePower={toggleSynopticPower}
               onStartLinking={startLinking}
               onCompleteLinking={completeLinking}
+              connectedKeys={connectedKeys}
+              linkTargets={linkTargets}
+              linkSourceKey={linkSourceKey}
               onTrace={() => traceSignal(node.id)}
               error={getNodeError(node.id)}
             />
@@ -1035,6 +1049,9 @@ export const DeviceNodeCard = memo(function DeviceNodeCard({
   onTogglePower,
   onStartLinking,
   onCompleteLinking,
+  connectedKeys,
+  linkTargets,
+  linkSourceKey,
   onTrace,
   error,
 }: {
@@ -1046,8 +1063,12 @@ export const DeviceNodeCard = memo(function DeviceNodeCard({
   onUpdate: (id: string, patch: Partial<SynopticNode>) => void;
   onRemove: (id: string) => void;
   onTogglePower: (id: string) => void;
-  onStartLinking: (node: SynopticNode, port: SynopticPort, e: ReactPointerEvent) => void;
-  onCompleteLinking: (node: SynopticNode, port: SynopticPort, e: ReactPointerEvent) => void;
+  onStartLinking: (node: SynopticNode, port: SynopticPort, direction: PortDirection, e: ReactPointerEvent) => void;
+  onCompleteLinking: (node: SynopticNode, port: SynopticPort, direction: PortDirection, e: ReactPointerEvent) => void;
+  connectedKeys: Set<string>;
+  /** Ports pouvant recevoir le câble en cours de tracé (null hors tracé). */
+  linkTargets: Set<string> | null;
+  linkSourceKey: string | null;
   onTrace: () => void;
   error?: { message: string; severity: "error" | "warning" };
 }) {
@@ -1068,6 +1089,7 @@ export const DeviceNodeCard = memo(function DeviceNodeCard({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
+      data-synoptic-card={node.id}
       className={`synoptic-card group absolute z-20 flex cursor-move flex-col rounded-xl border bg-gradient-to-b from-ink-800 to-ink-850 text-slate-100 shadow-[0_8px_28px_rgb(0_0_0/0.35)] transition-shadow hover:shadow-[0_12px_36px_rgb(0_0_0/0.5)] ${selected ? "border-violet-400 ring-4 ring-violet-400/25" : "border-white/12"}`}
       style={{
         left: node.x,
@@ -1135,21 +1157,27 @@ export const DeviceNodeCard = memo(function DeviceNodeCard({
           )}
           {portsIn.map((port) => {
             const cableCfg = CABLE_COLORS[port.type] || CABLE_COLORS.hdmi;
+            const key = directedKey(node.id, "in", port.id);
+            const connected = connectedKeys.has(key);
+            const isSource = linkSourceKey === key;
+            const isTarget = Boolean(linkTargets?.has(key));
+            const dimmed = Boolean(linkTargets) && !isSource && !isTarget;
             return (
               <div
                 key={port.id}
                 data-synoptic-node={node.id}
                 data-synoptic-port={port.id}
                 data-synoptic-direction="in"
-                onPointerUp={(e) => onCompleteLinking(node, port, e)}
-                className="port-handle flex h-8 min-w-0 max-w-full items-center gap-1.5 cursor-pointer rounded px-1 py-1 hover:bg-white/10 transition"
-                title={`Entrée ${port.name} (${cableCfg.label}) - Déposer un câble ici`}
+                onPointerDown={(e) => onStartLinking(node, port, "in", e)}
+                onPointerUp={(e) => onCompleteLinking(node, port, "in", e)}
+                className={`port-handle flex h-8 min-w-0 max-w-full items-center gap-1.5 cursor-pointer rounded px-1 py-1 transition ${isSource ? "bg-violet-400/25" : isTarget ? "bg-violet-400/12" : "hover:bg-white/10"} ${dimmed ? "opacity-30" : ""}`}
+                title={`Entrée ${port.name} (${cableCfg.label}) - ${connected ? "reliée · " : ""}glisser vers une sortie pour câbler`}
               >
                 <div
-                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 bg-ink-850 shadow-sm"
-                  style={{ borderColor: cableCfg.color }}
+                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 shadow-sm transition"
+                  style={{ borderColor: cableCfg.color, background: connected ? cableCfg.color : "var(--color-ink-850)", boxShadow: isTarget ? `0 0 0 3px ${cableCfg.color}66` : undefined }}
                 >
-                  <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: cableCfg.color }} />
+                  <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: connected ? "var(--color-ink-850)" : cableCfg.color }} />
                 </div>
                 <span className="min-w-0 whitespace-normal break-words text-[10px] font-semibold leading-tight text-slate-200">{port.name} <span className="font-mono text-[8px] text-slate-400">({cableCfg.label})</span></span>
               </div>
@@ -1191,22 +1219,28 @@ export const DeviceNodeCard = memo(function DeviceNodeCard({
           )}
           {portsOut.map((port) => {
             const cableCfg = CABLE_COLORS[port.type] || CABLE_COLORS.hdmi;
+            const key = directedKey(node.id, "out", port.id);
+            const connected = connectedKeys.has(key);
+            const isSource = linkSourceKey === key;
+            const isTarget = Boolean(linkTargets?.has(key));
+            const dimmed = Boolean(linkTargets) && !isSource && !isTarget;
             return (
               <div
                 key={port.id}
                 data-synoptic-node={node.id}
                 data-synoptic-port={port.id}
                 data-synoptic-direction="out"
-                onPointerDown={(e) => onStartLinking(node, port, e)}
-                className="port-handle flex h-8 min-w-0 max-w-full items-center justify-end gap-1.5 cursor-pointer rounded px-1 py-1 hover:bg-white/10 transition"
-                title={`Sortie ${port.name} (${cableCfg.label}) - Glisser pour relier`}
+                onPointerDown={(e) => onStartLinking(node, port, "out", e)}
+                onPointerUp={(e) => onCompleteLinking(node, port, "out", e)}
+                className={`port-handle flex h-8 min-w-0 max-w-full items-center justify-end gap-1.5 cursor-pointer rounded px-1 py-1 transition ${isSource ? "bg-violet-400/25" : isTarget ? "bg-violet-400/12" : "hover:bg-white/10"} ${dimmed ? "opacity-30" : ""}`}
+                title={`Sortie ${port.name} (${cableCfg.label}) - ${connected ? "reliée · " : ""}glisser vers une entrée pour câbler`}
               >
                 <span className="min-w-0 whitespace-normal break-words text-right text-[10px] font-semibold leading-tight text-slate-200">{port.name} <span className="font-mono text-[8px] text-slate-400">({cableCfg.label})</span></span>
                 <div
-                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 bg-ink-850 shadow-sm"
-                  style={{ borderColor: cableCfg.color }}
+                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 shadow-sm transition"
+                  style={{ borderColor: cableCfg.color, background: connected ? cableCfg.color : "var(--color-ink-850)", boxShadow: isTarget ? `0 0 0 3px ${cableCfg.color}66` : undefined }}
                 >
-                  <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: cableCfg.color }} />
+                  <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: connected ? "var(--color-ink-850)" : cableCfg.color }} />
                 </div>
               </div>
             );

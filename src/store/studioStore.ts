@@ -4,6 +4,7 @@ import { CATALOG, CATALOG_MAP } from "../lib/catalog";
 import { SYNOPTIC_TEMPLATES } from "../lib/synopticTemplates";
 import { GRID_SIZE } from "../lib/constants";
 import { computeSynopticAutoLayout } from "../lib/synopticLayout";
+import { connectPorts, sanitizeLinks } from "../lib/synopticLinks";
 import type { PlanBackground, BoardLayer, BoardObject, BoardStatus, CableType, CameraView, CatalogItem, SynopticLink, SynopticNode, ToolMode, ViewMode } from "../lib/types";
 
 const uid = () =>
@@ -213,7 +214,8 @@ function buildSynoptic(state: { items: BoardObject[]; catalog: CatalogItem[] }):
       });
     }
 
-  return { nodes, links };
+  // Liens sans port exact ou de types incompatibles : remis en cohérence dès la construction.
+  return { nodes, links: sanitizeLinks(nodes, links).links };
 }
 
 let storageWarned = false;
@@ -390,7 +392,7 @@ type StudioState = {
   moveSynopticNodes: (moves: Array<{ id: string; x: number; y: number }>) => void;
   removeSynopticNode: (id: string) => void;
   toggleSynopticPower: (id: string) => void;
-  addSynopticLink: (fromNodeId: string, toNodeId: string, fromPortId?: string, toPortId?: string, cableType?: CableType) => void;
+  addSynopticLink: (fromNodeId: string, toNodeId: string, fromPortId?: string, toPortId?: string, cableType?: CableType) => { ok: boolean; message: string };
   removeSynopticLink: (id: string) => void;
   updateSynopticLink: (id: string, patch: Partial<SynopticLink>) => void;
   exportProject: () => string;
@@ -613,6 +615,8 @@ export const useStudio = create<StudioState>()(
           catalog: updatedCatalog,
           items: updatedItems,
           synopticNodes: updatedSynoptic,
+          // Un port supprimé ou de type changé ne doit pas laisser de câble orphelin.
+          synopticLinks: sanitizeLinks(updatedSynoptic, get().synopticLinks).links,
           toast: "Objet mis à jour dans la bibliothèque ✓",
         });
       },
@@ -777,6 +781,7 @@ export const useStudio = create<StudioState>()(
 
         set({
           synopticNodes: nextSynopticNodes,
+          synopticLinks: patch.portsIn || patch.portsOut ? sanitizeLinks(nextSynopticNodes, get().synopticLinks).links : get().synopticLinks,
           items: nextItems,
         });
       },
@@ -807,15 +812,28 @@ export const useStudio = create<StudioState>()(
         }),
 
       addSynopticLink: (fromNodeId, toNodeId, fromPortId, toPortId, cableType = "hdmi") => {
-        const newLink: SynopticLink = {
-          id: uid(),
-          fromNodeId,
-          fromPortId,
-          toNodeId,
-          toPortId,
-          cableType,
-        };
-        set({ synopticLinks: [...get().synopticLinks, newLink] });
+        const { synopticNodes: nodes, synopticLinks: links } = get();
+        const fromNode = nodes.find((node) => node.id === fromNodeId);
+        const toNode = nodes.find((node) => node.id === toNodeId);
+        // Ports non précisés : premier port compatible, de préférence une entrée libre.
+        const outPortId = fromPortId ?? fromNode?.portsOut.find((port) => port.type === cableType)?.id;
+        const inPortId = toPortId
+          ?? toNode?.portsIn.find((port) => port.type === cableType && !links.some((link) => link.toNodeId === toNodeId && link.toPortId === port.id))?.id
+          ?? toNode?.portsIn.find((port) => port.type === cableType)?.id;
+        if (!outPortId || !inPortId) {
+          const message = "Aucun port compatible pour relier ces deux appareils";
+          set({ toast: message });
+          return { ok: false, message };
+        }
+        const result = connectPorts(nodes, links, { nodeId: fromNodeId, portId: outPortId }, { nodeId: toNodeId, portId: inPortId }, uid);
+        if (!result.ok) {
+          set({ toast: result.reason });
+          return { ok: false, message: result.reason };
+        }
+        const label = result.link.cableType.toUpperCase();
+        const message = result.replaced ? `Liaison ${label} créée · elle remplace l'ancienne source de cette entrée` : `Liaison ${label} créée ✓`;
+        set({ synopticLinks: result.links, toast: message });
+        return { ok: true, message };
       },
 
       removeSynopticLink: (id) =>
@@ -825,7 +843,8 @@ export const useStudio = create<StudioState>()(
 
       updateSynopticLink: (id, patch) =>
         set({
-          synopticLinks: get().synopticLinks.map((l) => (l.id === id ? { ...l, ...patch } : l)),
+          // Seule l'étiquette est modifiable : extrémités et type de câble découlent des ports reliés.
+          synopticLinks: get().synopticLinks.map((l) => (l.id === id ? { ...l, label: patch.label } : l)),
         }),
 
       exportProject: () => {
@@ -859,7 +878,7 @@ export const useStudio = create<StudioState>()(
             camera: data.camera || { x: 80, y: 40, zoom: 1 },
             viewMode: data.viewMode || "plan",
             synopticNodes: Array.isArray(data.synopticNodes) ? data.synopticNodes : [],
-            synopticLinks: Array.isArray(data.synopticLinks) ? data.synopticLinks : [],
+            synopticLinks: Array.isArray(data.synopticNodes) && Array.isArray(data.synopticLinks) ? sanitizeLinks(data.synopticNodes, data.synopticLinks).links : [],
             planBackground: data.planBackground?.image ? data.planBackground : null,
             planBackgroundEditing: false,
             visibleLayers: { ...DEFAULT_VISIBLE_LAYERS, ...(data.visibleLayers || {}), accessories: data.visibleLayers?.accessories ?? data.visibleLayers?.data ?? true, lights: data.visibleLayers?.lights ?? data.visibleLayers?.power ?? true },
@@ -929,7 +948,7 @@ export const useStudio = create<StudioState>()(
     {
       name: "shotboard-studio",
       storage: createJSONStorage(() => safeStorage),
-      version: 6,
+      version: 7,
       migrate: (persistedState: any, version: number) => {
         let state = persistedState;
         if (version < 2 || !state) {
@@ -955,6 +974,10 @@ export const useStudio = create<StudioState>()(
             items: state.items.map((item: BoardObject) => ({ ...item, layer: getBoardLayer(item) })),
             visibleLayers: { ...DEFAULT_VISIBLE_LAYERS, ...(state.visibleLayers || {}), accessories: state.visibleLayers?.accessories ?? state.visibleLayers?.data ?? true, lights: state.visibleLayers?.lights ?? state.visibleLayers?.power ?? true },
           };
+        }
+        // v7 : liens remis en cohérence (ports exacts, un seul câble par entrée, pas de câble orphelin).
+        if (version < 7 && state && Array.isArray(state.synopticNodes) && Array.isArray(state.synopticLinks)) {
+          state = { ...state, synopticLinks: sanitizeLinks(state.synopticNodes, state.synopticLinks).links };
         }
         if (state) {
           state = {

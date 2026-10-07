@@ -10,7 +10,7 @@ Shotboard Studio est un outil de planification de tournage et de conception de s
 - Lumières avec faisceau réglable (rayon, ouverture, puissance) et caméras avec champ de vision
 - Alignement et répartition des objets sélectionnés
 - Annuler / rétablir (Ctrl+Z / Ctrl+Y) pour le plan, le synoptique et le fond de plan
-- Mode synoptique pour relier caméra, audio, mixage et écrans, avec validation en direct
+- Mode synoptique pour relier caméra, audio, mixage et écrans : câbles tirés depuis une sortie ou une entrée, ports compatibles mis en évidence, types de câbles contrôlés (une seule source par entrée), validation en direct et détection des boucles de signal
 - Thème clair ou sombre (bouton soleil / lune)
 - Export PNG, export / import JSON et bibliothèque de projets enregistrés dans le navigateur
 - **Partage par lien** : le projet est compressé dans l'adresse ; la page de partage affiche un aperçu du plan et permet de l'ouvrir dans l'éditeur (votre projet actuel est sauvegardé avant)
