@@ -19,6 +19,7 @@ import {
   X,
   AlertTriangle,
   Search,
+  Network,
 } from "lucide-react";
 import { useStudio } from "../store/studioStore";
 import { VisualAsset } from "./VisualAsset";
@@ -129,6 +130,11 @@ export function SynopticBoard() {
   const repairedCanonicalLinksRef = useRef(false);
   const [marquee, setMarquee] = useState<{ startX: number; startY: number; x: number; y: number } | null>(null);
   const [showValidation, setShowValidation] = useState(false);
+  // La légende masque la barre d'outils sur les écrans moyens : ouverte seulement sur grand écran.
+  const [showLegend, setShowLegend] = useState(false);
+  useEffect(() => {
+    setShowLegend(window.matchMedia("(min-width: 1500px)").matches);
+  }, []);
   const selectedLink = useMemo(() => links.find((link) => link.id === selectedLinkId) ?? null, [links, selectedLinkId]);
   const isBoardEmpty = nodes.length === 0;
   const selectedNodeCount = selectedNodeIds.length;
@@ -547,7 +553,10 @@ export function SynopticBoard() {
     const layoutNodes = autoLayoutSynoptic();
     if (!layoutNodes.length) return;
     const viewportWidth = containerRef.current?.clientWidth ?? 1200;
-    const viewportHeight = containerRef.current?.clientHeight ?? 800;
+    // Marge haute : la barre d'outils flotte au-dessus du tableau.
+    const topInset = 84;
+    const bottomInset = 24;
+    const viewportHeight = (containerRef.current?.clientHeight ?? 800) - topInset - bottomInset;
     const bounds = layoutNodes.reduce(
       (current, node) => {
         const width = synopticNodeWidth(node);
@@ -567,9 +576,21 @@ export function SynopticBoard() {
     setZoom(nextZoom);
     setPan({
       x: (viewportWidth - contentWidth * nextZoom) / 2 - bounds.minX * nextZoom,
-      y: (viewportHeight - contentHeight * nextZoom) / 2 - bounds.minY * nextZoom,
+      y: topInset + (viewportHeight - contentHeight * nextZoom) / 2 - bounds.minY * nextZoom,
     });
   };
+
+  // Dès que le synoptique passe de vide à rempli (génération, import), on le recadre.
+  const previousNodeCount = useRef(nodes.length);
+  useEffect(() => {
+    if (previousNodeCount.current === 0 && nodes.length > 0) {
+      const frame = window.requestAnimationFrame(autoLayoutAndFit);
+      previousNodeCount.current = nodes.length;
+      return () => window.cancelAnimationFrame(frame);
+    }
+    previousNodeCount.current = nodes.length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes.length]);
 
 
   return (
@@ -714,9 +735,17 @@ export function SynopticBoard() {
         </div>
       )}
 
-      {/* Légende en haut à droite (fidele à l'image fournie) */}
-      <div className="synoptic-ui absolute right-4 top-3 z-30 rounded-2xl border border-white/10 bg-ink-850/95 p-3 shadow-lg backdrop-blur">
-        <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Légende Câbles & Signaux</p>
+      {/* Légende des câbles : repliable */}
+      {!showLegend && (
+        <button type="button" onClick={() => setShowLegend(true)} className="synoptic-ui btn absolute right-4 top-3 z-30" title="Afficher la légende des câbles">
+          <Layers size={13} /> Légende
+        </button>
+      )}
+      {showLegend && <div className="synoptic-ui absolute right-4 top-3 z-30 rounded-2xl border border-white/10 bg-ink-850/95 p-3 shadow-lg backdrop-blur">
+        <div className="mb-2 flex items-center justify-between gap-4">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Légende Câbles & Signaux</p>
+          <button type="button" onClick={() => setShowLegend(false)} aria-label="Masquer la légende" className="rounded p-0.5 text-slate-400 hover:bg-white/10 hover:text-white"><X size={12} /></button>
+        </div>
         <div className="space-y-1.5 text-[11px] font-medium text-slate-200">
           <div className="flex items-center justify-between gap-6">
             <span>Jack / Mini-jack</span>
@@ -745,7 +774,7 @@ export function SynopticBoard() {
             </div>
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* Contrôles de Zoom */}
       <div className="synoptic-ui absolute bottom-4 right-4 z-30 flex items-center gap-1 rounded-xl border border-white/10 bg-ink-850 p-1 shadow-md">
@@ -796,7 +825,7 @@ export function SynopticBoard() {
         className={`synoptic-dots absolute inset-0 overflow-hidden ${spacePan || isPanning ? "cursor-grab active:cursor-grabbing" : marquee ? "cursor-crosshair" : "cursor-default"}`}
       >
         {isBoardEmpty && (
-          <div className="absolute left-1/2 top-1/2 z-10 w-[min(520px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-violet-400/30 bg-ink-850/90 p-6 text-center shadow-2xl backdrop-blur-sm">
+          <div className="synoptic-ui absolute left-1/2 top-1/2 z-10 w-[min(520px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-violet-400/30 bg-ink-850/90 p-6 text-center shadow-2xl backdrop-blur-sm">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-400/15 text-violet-200">
               <Network size={28} />
             </div>

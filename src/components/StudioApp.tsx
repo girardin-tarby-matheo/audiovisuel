@@ -10,7 +10,8 @@ import { ShortcutsDialog } from "./ShortcutsDialog";
 import { useStudio } from "../store/studioStore";
 import { undo, redo } from "../store/history";
 import { GRID_SIZE } from "../lib/constants";
-import { Clapperboard, MousePointer2, Hand, Download, ArrowRight, Undo2, Move } from "lucide-react";
+import { saveToProjectLibrary, takePendingImport } from "../lib/shareImport";
+import { Clapperboard, MousePointer2, Hand, ZoomIn, ArrowRight, Undo2, Move } from "lucide-react";
 
 function WelcomeOverlay({ onDismiss }: { onDismiss: () => void }) {
   return (
@@ -30,7 +31,7 @@ function WelcomeOverlay({ onDismiss }: { onDismiss: () => void }) {
           {[
             { icon: <MousePointer2 size={15} />, key: "V", text: "Mode sélection & édition" },
             { icon: <Hand size={15} />, key: "Espace / H", text: "Mode déplacement du plateau" },
-            { icon: <Download size={15} />, key: "Molette", text: "Zoom avant / arrière" },
+            { icon: <ZoomIn size={15} />, key: "Molette", text: "Zoom avant / arrière" },
             { icon: <Undo2 size={15} />, key: "Ctrl + Z / Y", text: "Annuler / rétablir" },
             { icon: <Move size={15} />, key: "Flèches", text: "Déplacer la sélection (Maj = x4)" },
           ].map((hint) => (
@@ -133,6 +134,16 @@ export default function StudioApp() {
     apply();
     query.addEventListener("change", apply);
     return () => query.removeEventListener("change", apply);
+  }, []);
+
+  // Projet ouvert depuis un lien de partage : on sauvegarde l'actuel avant de le remplacer.
+  useEffect(() => {
+    const pending = takePendingImport();
+    if (!pending) return;
+    const state = useStudio.getState();
+    const saved = saveToProjectLibrary(`${state.title || "Projet sans titre"} (avant import)`, state.exportProject());
+    state.importProject(pending);
+    state.setToast(saved ? "Projet partagé importé · l'ancien est dans « Projets » ✓" : "Projet partagé importé ✓");
   }, []);
 
   useEffect(() => {

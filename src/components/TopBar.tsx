@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { Download, Share2, Clapperboard, RotateCcw, Loader2, Check, LayoutDashboard, Network, FolderOpen, Undo2, Redo2, Sun, Moon, PanelLeft, PanelRight, Keyboard } from "lucide-react";
 import { toPng } from "html-to-image";
 import { useStudio } from "../store/studioStore";
+import { encodeShare } from "../lib/shareImport";
 import { useHistory, undo, redo } from "../store/history";
 
 type ActionState = "idle" | "busy" | "done";
@@ -40,19 +41,28 @@ export function TopBar({ onOpenProjects, onOpenShortcuts, panels }: { onOpenProj
   const share = useCallback(async () => {
     if (shareState !== "idle") return;
     setShareState("busy");
-    // L'image de fond est trop lourde pour une URL : elle n'est pas incluse dans le lien.
-    const shared = { ...JSON.parse(exportProject()), planBackground: null };
-    const url = `${window.location.origin}/share/preview?data=${encodeURIComponent(JSON.stringify(shared))}`;
-    if (url.length > 8000) {
+    // Contenu allégé : sans image de fond ni catalogue d'usine (seuls les objets personnalisés sont conservés).
+    const full = JSON.parse(exportProject());
+    const shared = {
+      title: full.title,
+      status: full.status,
+      items: full.items,
+      synopticNodes: full.synopticNodes,
+      synopticLinks: full.synopticLinks,
+      visibleLayers: full.visibleLayers,
+      catalog: Array.isArray(full.catalog) ? full.catalog.filter((entry: { isCustom?: boolean }) => entry.isCustom) : [],
+    };
+    const url = `${window.location.origin}/share/preview#${await encodeShare(JSON.stringify(shared))}`;
+    if (url.length > 200000) {
       setToast("Projet trop volumineux pour un lien partageable · Exportez le JSON");
       setShareState("idle");
       return;
     }
     try {
       await navigator.clipboard.writeText(url);
-      setToast(`Lien copié · ${url}`);
+      setToast("Lien de partage copié ✓");
     } catch {
-      setToast(url);
+      window.prompt("Copiez le lien de partage :", url);
     }
     setShareState("done");
     window.setTimeout(() => {

@@ -73,7 +73,7 @@ const seedItems = (catalogList: CatalogItem[] = CATALOG): BoardObject[] => {
     ["light-soft", 250, 280],
     ["light-led", 820, 280],
     ["light-fresnel", 540, 90],
-    ["set-boom", 360, 250],
+    ["audio-boom", 360, 250],
     ["talent-director", 760, 620],
   ];
   return layout
@@ -302,9 +302,9 @@ export const useStudio = create<StudioState>()(
           id,
           isCustom: true,
           defaults: {
-            rotation: 0,
-            scale: 1,
             ...itemData.defaults,
+            rotation: itemData.defaults?.rotation ?? 0,
+            scale: itemData.defaults?.scale ?? 1,
           },
         };
         set({
@@ -643,7 +643,7 @@ export const useStudio = create<StudioState>()(
               fromPortId: aval.fromPort,
               toNodeId: nodeId,
               toPortId: aval.toPort,
-              cableType: aval.cable || "hdmi",
+              cableType: (aval.cable || "hdmi") as CableType,
             });
           }
         });
@@ -664,7 +664,8 @@ export const useStudio = create<StudioState>()(
         }
 
         set({
-          synopticNodes: nodes,
+          // Les positions de départ sont indicatives : on range les cartes selon leurs largeurs réelles.
+          synopticNodes: computeSynopticAutoLayout(nodes, links),
           synopticLinks: links,
           viewMode: "synoptic",
         });
@@ -817,7 +818,10 @@ export const useStudio = create<StudioState>()(
             title: data.title || "Sans titre",
             status: data.status || "prep",
             items: Array.isArray(data.items) ? data.items.map((item: BoardObject) => ({ ...item, layer: getBoardLayer(item) })) : [],
-            catalog: Array.isArray(data.catalog) ? data.catalog : CATALOG,
+            // Fusionne le catalogue importé avec l'actuel (l'importé l'emporte) : on ne perd jamais les objets existants.
+            catalog: Array.isArray(data.catalog)
+              ? [...get().catalog.filter((entry) => !data.catalog.some((incoming: CatalogItem) => incoming.id === entry.id)), ...data.catalog]
+              : get().catalog,
             camera: data.camera || { x: 80, y: 40, zoom: 1 },
             viewMode: data.viewMode || "plan",
             synopticNodes: Array.isArray(data.synopticNodes) ? data.synopticNodes : [],
@@ -851,9 +855,9 @@ export const useStudio = create<StudioState>()(
             const catalogId = entry.catalogId || entry.id || entry.catalog || get().catalog.find((item) => item.name === entry.name)?.id;
             const item = catalogId ? fromCatalogWithList(get().catalog, catalogId, Number(entry.x) || 400 + index * 40, Number(entry.y) || 300 + index * 40) : null;
             return item ? { ...item, ...(entry.name ? { name: entry.name } : {}), ...(entry.label ? { label: entry.label } : {}), ...(entry.layer ? { layer: getBoardLayer({ ...item, layer: entry.layer }) } : {}) } : null;
-          }).filter((item): item is BoardObject => Boolean(item));
+          }).filter((item: BoardObject | null): item is BoardObject => Boolean(item));
           if (!imported.length) throw new Error("Aucun équipement reconnu");
-          set({ items: [...get().items, ...imported], selectedIds: imported.map((item) => item.id), selectedId: imported[imported.length - 1].id, toast: `${imported.length} équipement${imported.length > 1 ? "s" : ""} importé${imported.length > 1 ? "s" : ""} ✓` });
+          set({ items: [...get().items, ...imported], selectedIds: imported.map((item: BoardObject) => item.id), selectedId: imported[imported.length - 1].id, toast: `${imported.length} équipement${imported.length > 1 ? "s" : ""} importé${imported.length > 1 ? "s" : ""} ✓` });
         } catch {
           set({ toast: "Import équipements invalide" });
         }
