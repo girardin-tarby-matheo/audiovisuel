@@ -4,7 +4,7 @@ Shotboard Studio est un outil de planification de tournage et de conception de s
 
 ## Fonctionnalités principales
 
-- Plateau de plan de tournage avec objets, calques, zoom et déplacement
+- Plateau de plan de tournage avec objets, calques, zoom et déplacement ; un nouveau projet démarre avec une **régie de base** (ATEM Mini, table son, moniteur de retour, réalisateur) et son synoptique (console Yamaha, HyperDeck, écrans, casque…)
 - **Fond de plan** : importez un plan de salle ou une photo derrière les objets (opacité, taille, position)
 - Noms des objets placés automatiquement sans chevauchement, et déplaçables par double-clic
 - Lumières avec faisceau réglable (rayon, ouverture, puissance) et caméras avec champ de vision

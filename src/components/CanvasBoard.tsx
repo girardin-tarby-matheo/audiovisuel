@@ -110,28 +110,45 @@ export function CanvasBoard() {
   const clipboardRef = useRef<string[]>([]);
   const selectedItems = useMemo(() => items.filter((candidate) => selectedIds.includes(candidate.id)), [items, selectedIds]);
 
-  // Auto-center canvas on initial load
+  // Cadrage automatique au premier lancement (caméra par défaut) : le plan est centré sur ses objets
+  // et recadré quand la zone change de taille (panneaux repliés…), jusqu'à ce que vous touchiez à la
+  // vue ou aux objets.
   useEffect(() => {
     const board = boardRef.current;
-    if (!board || items.length === 0) return;
-    const currentCam = useStudio.getState().camera;
-    if (currentCam.x === 80 && currentCam.y === 40) {
-      const xs = items.map((i) => i.x);
-      const ys = items.map((i) => i.y);
+    if (!board) return;
+    const initial = useStudio.getState().camera;
+    let autoFit = initial.x === 80 && initial.y === 40;
+    let fitting = false;
+
+    const fit = () => {
+      if (!autoFit || !board.clientWidth) return;
+      const list = useStudio.getState().items;
+      if (!list.length) return;
+      const xs = list.map((i) => i.x);
+      const ys = list.map((i) => i.y);
       const minX = Math.min(...xs) - 80;
       const maxX = Math.max(...xs) + 80;
       const minY = Math.min(...ys) - 80;
       const maxY = Math.max(...ys) + 80;
-      const w = board.clientWidth || 900;
-      const h = board.clientHeight || 700;
+      const w = board.clientWidth;
+      const h = board.clientHeight;
       const zoom = Math.min(1.15, Math.max(0.65, Math.min(w / (maxX - minX), h / (maxY - minY)) * 0.9));
-      setCamera({
-        zoom,
-        x: w / 2 - ((minX + maxX) / 2) * zoom,
-        y: h / 2 - ((minY + maxY) / 2) * zoom,
-      });
-    }
-  }, [items.length, setCamera]);
+      fitting = true;
+      setCamera({ zoom, x: w / 2 - ((minX + maxX) / 2) * zoom, y: h / 2 - ((minY + maxY) / 2) * zoom });
+      fitting = false;
+    };
+
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(board);
+    const unsubscribe = useStudio.subscribe((state, prev) => {
+      if ((!fitting && state.camera !== prev.camera) || state.items !== prev.items) autoFit = false;
+    });
+    return () => {
+      observer.disconnect();
+      unsubscribe();
+    };
+  }, [setCamera]);
 
   // Keyboard shortcuts
   useEffect(() => {

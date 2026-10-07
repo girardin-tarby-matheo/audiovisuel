@@ -11,6 +11,211 @@ const uid = () =>
     ? crypto.randomUUID()
     : `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
+/** Construit le synoptique (régie de base + appareils du plan) sans toucher au store. */
+function buildSynoptic(state: { items: BoardObject[]; catalog: CatalogItem[] }): { nodes: SynopticNode[]; links: SynopticLink[] } {
+    const relevantItems = state.items.filter((item) => {
+      if (item.category === "talent") return false;
+      if (item.catalogId.startsWith("set-table") || item.catalogId.startsWith("set-chair") || item.catalogId.startsWith("set-cyc") || item.catalogId.startsWith("grip-")) {
+        return false;
+      }
+      return true;
+    });
+
+    const nodes: SynopticNode[] = [];
+    const links: SynopticLink[] = [];
+
+    // 1. Mélangeur ATEM Mini Expert
+    const atemTemplate = SYNOPTIC_TEMPLATES["atem-mini-expert"];
+    const atemId = uid();
+    nodes.push({
+      id: atemId,
+      sourceId: null,
+      title: atemTemplate.title,
+      subtitle: atemTemplate.subtitle,
+      deviceType: atemTemplate.deviceType,
+      color: atemTemplate.color,
+      x: 620,
+      y: 200,
+      width: 280,
+      height: 380,
+      portsIn: structuredClone(atemTemplate.portsIn),
+      portsOut: structuredClone(atemTemplate.portsOut),
+      needsPower: atemTemplate.needsPower,
+    });
+
+    // 2. Console Son Yamaha
+    const yamahaTemplate = SYNOPTIC_TEMPLATES["yamaha-mg12xu"];
+    const yamahaId = uid();
+    nodes.push({
+      id: yamahaId,
+      sourceId: null,
+      title: yamahaTemplate.title,
+      subtitle: yamahaTemplate.subtitle,
+      deviceType: yamahaTemplate.deviceType,
+      color: yamahaTemplate.color,
+      x: 480,
+      y: 680,
+      width: 250,
+      height: 340,
+      portsIn: structuredClone(yamahaTemplate.portsIn),
+      portsOut: structuredClone(yamahaTemplate.portsOut),
+      needsPower: yamahaTemplate.needsPower,
+      warningBadge: yamahaTemplate.warningBadge,
+    });
+
+    // Liaison Yamaha -> ATEM
+    links.push({
+      id: uid(),
+      fromNodeId: yamahaId,
+      fromPortId: yamahaTemplate.portsOut.find(p => p.id === "stereo-out-1")?.id,
+      toNodeId: atemId,
+      toPortId: atemTemplate.portsIn.find(p => p.id === "audio-in-1")?.id,
+      cableType: "jack",
+      label: "Audio Mix",
+    });
+
+    // 3. Caméras
+    const planCameras = relevantItems.filter((i) => i.category === "camera");
+    const camTemplate = SYNOPTIC_TEMPLATES["generic-camera"];
+    planCameras.forEach((cam, i) => {
+      const nodeId = uid();
+      const catalogItem = state.catalog.find((item) => item.id === cam.catalogId);
+      nodes.push({
+        id: nodeId,
+        sourceId: cam.id,
+        title: cam.name || `Caméra ${i + 1}`,
+        subtitle: cam.label || "Sortie HDMI / SDI",
+        category: cam.category,
+        deviceType: camTemplate.deviceType,
+        color: cam.color || catalogItem?.color || camTemplate.color,
+        image: cam.image ?? catalogItem?.image,
+        fit: cam.fit ?? catalogItem?.fit,
+        background: cam.background ?? catalogItem?.background,
+        visualKey: cam.visualKey ?? catalogItem?.visualKey ?? cam.catalogId,
+        x: 160,
+        y: 180 + i * 115,
+        portsIn: [],
+        portsOut: structuredClone(camTemplate.portsOut),
+        needsPower: true,
+      });
+
+      if (i < atemTemplate.portsIn.filter(p => p.type === "hdmi").length) {
+        const hdmiPort = atemTemplate.portsIn.filter(p => p.type === "hdmi")[i];
+        links.push({
+          id: uid(),
+          fromNodeId: nodeId,
+          fromPortId: camTemplate.portsOut[0].id,
+          toNodeId: atemId,
+          toPortId: hdmiPort.id,
+          cableType: "hdmi",
+        });
+      }
+    });
+
+    // 4. Micros
+    const planAudios = relevantItems.filter((i) => i.category === "audio");
+    const micTemplate = SYNOPTIC_TEMPLATES["generic-mic"];
+    planAudios.slice(0, 4).forEach((mic, i) => {
+      const nodeId = uid();
+      const catalogItem = state.catalog.find((item) => item.id === mic.catalogId);
+      nodes.push({
+        id: nodeId,
+        sourceId: mic.id,
+        title: mic.name || `Micro ${i + 1}`,
+        subtitle: mic.label || "XLR",
+        category: mic.category,
+        deviceType: micTemplate.deviceType,
+        color: mic.color || catalogItem?.color || micTemplate.color,
+        image: mic.image ?? catalogItem?.image,
+        fit: mic.fit ?? catalogItem?.fit,
+        background: mic.background ?? catalogItem?.background,
+        visualKey: mic.visualKey ?? catalogItem?.visualKey ?? mic.catalogId,
+        x: 160,
+        y: 670 + i * 95,
+        portsIn: [],
+        portsOut: structuredClone(micTemplate.portsOut),
+        needsPower: false,
+      });
+
+      const yamahaPort = yamahaTemplate.portsIn.filter(p => p.type === "xlr")[i];
+      if (yamahaPort) {
+        links.push({
+          id: uid(),
+          fromNodeId: nodeId,
+          fromPortId: micTemplate.portsOut[0].id,
+          toNodeId: yamahaId,
+          toPortId: yamahaPort.id,
+          cableType: "xlr",
+        });
+      }
+    });
+
+    // 5. Appareils avals
+    const avals = [
+      { templateId: "pc-stream", x: 1040, y: 120, linkFrom: atemId, fromPort: "pgm-usb-1", toPort: "usb-in" },
+      { templateId: "pc-atem", x: 1160, y: 200 },
+      { templateId: "headphone-monitor", x: 940, y: 280, linkFrom: atemId, fromPort: "audio-out-jack", toPort: "jack-in" },
+      { templateId: "hyperdeck", x: 940, y: 400, linkFrom: atemId, fromPort: "pgm-hdmi", toPort: "hdmi-in", cable: "hdmi" },
+      { templateId: "master-screen", x: 1200, y: 380, linkFrom: "hyperdeck-ref", fromPort: "hdmi-out", toPort: "hdmi-in" },
+      { templateId: "multiview-screen", x: 940, y: 530, linkFrom: atemId, fromPort: "multiview-hdmi", toPort: "hdmi-in" },
+      { templateId: "di-box", x: 790, y: 680, linkFrom: yamahaId, fromPort: "stereo-out-2", toPort: "jack-in" },
+    ];
+
+    let hyperDeckNodeId = "";
+
+    avals.forEach(aval => {
+      const template = SYNOPTIC_TEMPLATES[aval.templateId];
+      const nodeId = uid();
+      if (aval.templateId === "hyperdeck") hyperDeckNodeId = nodeId;
+
+      nodes.push({
+        id: nodeId,
+        sourceId: null,
+        title: template.title,
+        subtitle: template.subtitle,
+        deviceType: template.deviceType,
+        color: template.color,
+        x: aval.x,
+        y: aval.y,
+        portsIn: structuredClone(template.portsIn),
+        portsOut: structuredClone(template.portsOut),
+        needsPower: template.needsPower,
+      });
+
+      if (aval.linkFrom) {
+        const fromId = aval.linkFrom === "hyperdeck-ref" ? hyperDeckNodeId : aval.linkFrom;
+        const fromTemplate = SYNOPTIC_TEMPLATES[aval.linkFrom === "hyperdeck-ref" ? "hyperdeck" : (aval.linkFrom === atemId ? "atem-mini-expert" : "yamaha-mg12xu")];
+
+        // Note: simplified port lookup for brevity in the logic
+        links.push({
+          id: uid(),
+          fromNodeId: fromId,
+          fromPortId: aval.fromPort,
+          toNodeId: nodeId,
+          toPortId: aval.toPort,
+          cableType: (aval.cable || "hdmi") as CableType,
+        });
+      }
+    });
+
+    const hyperDeckNode = nodes.find((node) => node.id === hyperDeckNodeId);
+    const masterScreenNode = nodes.find((node) => node.title === SYNOPTIC_TEMPLATES["master-screen"].title);
+    const hyperDeckOutput = hyperDeckNode?.portsOut.find((port) => port.id === "hdmi-out");
+    const masterScreenInput = masterScreenNode?.portsIn.find((port) => port.id === "hdmi-in");
+    if (hyperDeckNode && masterScreenNode && hyperDeckOutput && masterScreenInput && !links.some((link) => link.fromNodeId === hyperDeckNode.id && link.toNodeId === masterScreenNode.id)) {
+      links.push({
+        id: uid(),
+        fromNodeId: hyperDeckNode.id,
+        fromPortId: hyperDeckOutput.id,
+        toNodeId: masterScreenNode.id,
+        toPortId: masterScreenInput.id,
+        cableType: "hdmi",
+      });
+    }
+
+  return { nodes, links };
+}
+
 let storageWarned = false;
 
 /** Stockage tolérant : un navigateur plein ou bloqué ne doit jamais faire échouer une action. */
@@ -89,23 +294,12 @@ function fromCatalogWithList(catalogList: CatalogItem[], catalogId: string, x: n
 }
 
 const seedItems = (catalogList: CatalogItem[] = CATALOG): BoardObject[] => {
+  // Régie de base : moniteur de retour, mélangeur ATEM, table son et le réalisateur aux commandes.
   const layout: Array<[string, number, number]> = [
-    ["set-cyc", 520, 180],
-    ["set-table", 540, 390],
-    ["set-chair", 430, 430],
-    ["set-chair", 650, 430],
-    ["set-atem-mini", 180, 300],
-    ["set-monitor", 180, 205],
-    ["set-sound-desk", 180, 430],
-    ["talent-guest", 430, 360],
-    ["talent-actor", 650, 360],
-    ["cam-main", 540, 640],
-    ["cam-b", 280, 560],
-    ["light-soft", 250, 280],
-    ["light-led", 820, 280],
-    ["light-fresnel", 540, 90],
-    ["audio-boom", 360, 250],
-    ["talent-director", 760, 620],
+    ["set-monitor", 420, 230],
+    ["set-atem-mini", 420, 340],
+    ["set-sound-desk", 650, 340],
+    ["talent-director", 530, 480],
   ];
   return layout
     .map(([id, x, y]) => fromCatalogWithList(catalogList, id, x, y))
@@ -127,6 +321,15 @@ function addMissingControlRoom(items: BoardObject[], catalogList: CatalogItem[] 
     return [...result, item];
   }, items);
 }
+
+/** Plateau de départ : une régie de base (plan) et son synoptique, sans décor ni équipe de tournage. */
+function createInitialBoard() {
+  const items = seedItems(CATALOG);
+  const { nodes, links } = buildSynoptic({ items, catalog: CATALOG });
+  return { items, synopticNodes: computeSynopticAutoLayout(nodes, links), synopticLinks: links };
+}
+
+const INITIAL_BOARD = createInitialBoard();
 
 type StudioState = {
   title: string;
@@ -179,7 +382,7 @@ type StudioState = {
   removeCatalogItem: (id: string) => void;
   resetCatalog: () => void;
   saveItemToCatalog: (itemId: string) => void;
-  generateSynoptic: () => void;
+  generateSynoptic: (options?: { show?: boolean }) => void;
   addSynopticNode: (custom?: Partial<SynopticNode>) => void;
   addSynopticNodeFromCatalog: (catalogId: string) => void;
   updateSynopticNode: (id: string, patch: Partial<SynopticNode>) => void;
@@ -199,10 +402,10 @@ type StudioState = {
 export const useStudio = create<StudioState>()(
   persist(
     (set, get) => ({
-      title: "Plateau — Interview studio",
+      title: "Nouveau projet",
       status: "prep",
       catalog: CATALOG,
-      items: seedItems(CATALOG),
+      items: INITIAL_BOARD.items,
       selectedId: null,
       selectedIds: [],
       camera: { x: 80, y: 40, zoom: 1 },
@@ -210,8 +413,8 @@ export const useStudio = create<StudioState>()(
       spacePan: false,
       toast: null,
       viewMode: "plan",
-      synopticNodes: [],
-      synopticLinks: [],
+      synopticNodes: INITIAL_BOARD.synopticNodes,
+      synopticLinks: INITIAL_BOARD.synopticLinks,
       visibleLayers: { ...DEFAULT_VISIBLE_LAYERS },
       planBackground: null,
       planBackgroundEditing: false,
@@ -492,213 +695,13 @@ export const useStudio = create<StudioState>()(
         set({ toast: `Paramètres enregistrés comme modèle par défaut pour « ${catItem.name} » ✓` });
       },
 
-      generateSynoptic: () => {
-        const state = get();
-        const relevantItems = state.items.filter((item) => {
-          if (item.category === "talent") return false;
-          if (item.catalogId.startsWith("set-table") || item.catalogId.startsWith("set-chair") || item.catalogId.startsWith("set-cyc") || item.catalogId.startsWith("grip-")) {
-            return false;
-          }
-          return true;
-        });
-
-        const nodes: SynopticNode[] = [];
-        const links: SynopticLink[] = [];
-
-        // 1. Mélangeur ATEM Mini Expert
-        const atemTemplate = SYNOPTIC_TEMPLATES["atem-mini-expert"];
-        const atemId = uid();
-        nodes.push({
-          id: atemId,
-          sourceId: null,
-          title: atemTemplate.title,
-          subtitle: atemTemplate.subtitle,
-          deviceType: atemTemplate.deviceType,
-          color: atemTemplate.color,
-          x: 620,
-          y: 200,
-          width: 280,
-          height: 380,
-          portsIn: structuredClone(atemTemplate.portsIn),
-          portsOut: structuredClone(atemTemplate.portsOut),
-          needsPower: atemTemplate.needsPower,
-        });
-
-        // 2. Console Son Yamaha
-        const yamahaTemplate = SYNOPTIC_TEMPLATES["yamaha-mg12xu"];
-        const yamahaId = uid();
-        nodes.push({
-          id: yamahaId,
-          sourceId: null,
-          title: yamahaTemplate.title,
-          subtitle: yamahaTemplate.subtitle,
-          deviceType: yamahaTemplate.deviceType,
-          color: yamahaTemplate.color,
-          x: 480,
-          y: 680,
-          width: 250,
-          height: 340,
-          portsIn: structuredClone(yamahaTemplate.portsIn),
-          portsOut: structuredClone(yamahaTemplate.portsOut),
-          needsPower: yamahaTemplate.needsPower,
-          warningBadge: yamahaTemplate.warningBadge,
-        });
-
-        // Liaison Yamaha -> ATEM
-        links.push({
-          id: uid(),
-          fromNodeId: yamahaId,
-          fromPortId: yamahaTemplate.portsOut.find(p => p.id === "stereo-out-1")?.id,
-          toNodeId: atemId,
-          toPortId: atemTemplate.portsIn.find(p => p.id === "audio-in-1")?.id,
-          cableType: "jack",
-          label: "Audio Mix",
-        });
-
-        // 3. Caméras
-        const planCameras = relevantItems.filter((i) => i.category === "camera");
-        const camTemplate = SYNOPTIC_TEMPLATES["generic-camera"];
-        planCameras.forEach((cam, i) => {
-          const nodeId = uid();
-          const catalogItem = state.catalog.find((item) => item.id === cam.catalogId);
-          nodes.push({
-            id: nodeId,
-            sourceId: cam.id,
-            title: cam.name || `Caméra ${i + 1}`,
-            subtitle: cam.label || "Sortie HDMI / SDI",
-            category: cam.category,
-            deviceType: camTemplate.deviceType,
-            color: cam.color || catalogItem?.color || camTemplate.color,
-            image: cam.image ?? catalogItem?.image,
-            fit: cam.fit ?? catalogItem?.fit,
-            background: cam.background ?? catalogItem?.background,
-            visualKey: cam.visualKey ?? catalogItem?.visualKey ?? cam.catalogId,
-            x: 160,
-            y: 180 + i * 115,
-            portsIn: [],
-            portsOut: structuredClone(camTemplate.portsOut),
-            needsPower: true,
-          });
-
-          if (i < atemTemplate.portsIn.filter(p => p.type === "hdmi").length) {
-            const hdmiPort = atemTemplate.portsIn.filter(p => p.type === "hdmi")[i];
-            links.push({
-              id: uid(),
-              fromNodeId: nodeId,
-              fromPortId: camTemplate.portsOut[0].id,
-              toNodeId: atemId,
-              toPortId: hdmiPort.id,
-              cableType: "hdmi",
-            });
-          }
-        });
-
-        // 4. Micros
-        const planAudios = relevantItems.filter((i) => i.category === "audio");
-        const micTemplate = SYNOPTIC_TEMPLATES["generic-mic"];
-        planAudios.slice(0, 4).forEach((mic, i) => {
-          const nodeId = uid();
-          const catalogItem = state.catalog.find((item) => item.id === mic.catalogId);
-          nodes.push({
-            id: nodeId,
-            sourceId: mic.id,
-            title: mic.name || `Micro ${i + 1}`,
-            subtitle: mic.label || "XLR",
-            category: mic.category,
-            deviceType: micTemplate.deviceType,
-            color: mic.color || catalogItem?.color || micTemplate.color,
-            image: mic.image ?? catalogItem?.image,
-            fit: mic.fit ?? catalogItem?.fit,
-            background: mic.background ?? catalogItem?.background,
-            visualKey: mic.visualKey ?? catalogItem?.visualKey ?? mic.catalogId,
-            x: 160,
-            y: 670 + i * 95,
-            portsIn: [],
-            portsOut: structuredClone(micTemplate.portsOut),
-            needsPower: false,
-          });
-
-          const yamahaPort = yamahaTemplate.portsIn.filter(p => p.type === "xlr")[i];
-          if (yamahaPort) {
-            links.push({
-              id: uid(),
-              fromNodeId: nodeId,
-              fromPortId: micTemplate.portsOut[0].id,
-              toNodeId: yamahaId,
-              toPortId: yamahaPort.id,
-              cableType: "xlr",
-            });
-          }
-        });
-
-        // 5. Appareils avals
-        const avals = [
-          { templateId: "pc-stream", x: 1040, y: 120, linkFrom: atemId, fromPort: "pgm-usb-1", toPort: "usb-in" },
-          { templateId: "pc-atem", x: 1160, y: 200 },
-          { templateId: "headphone-monitor", x: 940, y: 280, linkFrom: atemId, fromPort: "audio-out-jack", toPort: "jack-in" },
-          { templateId: "hyperdeck", x: 940, y: 400, linkFrom: atemId, fromPort: "pgm-hdmi", toPort: "hdmi-in", cable: "hdmi" },
-          { templateId: "master-screen", x: 1200, y: 380, linkFrom: "hyperdeck-ref", fromPort: "hdmi-out", toPort: "hdmi-in" },
-          { templateId: "multiview-screen", x: 940, y: 530, linkFrom: atemId, fromPort: "multiview-hdmi", toPort: "hdmi-in" },
-          { templateId: "di-box", x: 790, y: 680, linkFrom: yamahaId, fromPort: "stereo-out-2", toPort: "jack-in" },
-        ];
-
-        let hyperDeckNodeId = "";
-
-        avals.forEach(aval => {
-          const template = SYNOPTIC_TEMPLATES[aval.templateId];
-          const nodeId = uid();
-          if (aval.templateId === "hyperdeck") hyperDeckNodeId = nodeId;
-
-          nodes.push({
-            id: nodeId,
-            sourceId: null,
-            title: template.title,
-            subtitle: template.subtitle,
-            deviceType: template.deviceType,
-            color: template.color,
-            x: aval.x,
-            y: aval.y,
-            portsIn: structuredClone(template.portsIn),
-            portsOut: structuredClone(template.portsOut),
-            needsPower: template.needsPower,
-          });
-
-          if (aval.linkFrom) {
-            const fromId = aval.linkFrom === "hyperdeck-ref" ? hyperDeckNodeId : aval.linkFrom;
-            const fromTemplate = SYNOPTIC_TEMPLATES[aval.linkFrom === "hyperdeck-ref" ? "hyperdeck" : (aval.linkFrom === atemId ? "atem-mini-expert" : "yamaha-mg12xu")];
-
-            // Note: simplified port lookup for brevity in the logic
-            links.push({
-              id: uid(),
-              fromNodeId: fromId,
-              fromPortId: aval.fromPort,
-              toNodeId: nodeId,
-              toPortId: aval.toPort,
-              cableType: (aval.cable || "hdmi") as CableType,
-            });
-          }
-        });
-
-        const hyperDeckNode = nodes.find((node) => node.id === hyperDeckNodeId);
-        const masterScreenNode = nodes.find((node) => node.title === SYNOPTIC_TEMPLATES["master-screen"].title);
-        const hyperDeckOutput = hyperDeckNode?.portsOut.find((port) => port.id === "hdmi-out");
-        const masterScreenInput = masterScreenNode?.portsIn.find((port) => port.id === "hdmi-in");
-        if (hyperDeckNode && masterScreenNode && hyperDeckOutput && masterScreenInput && !links.some((link) => link.fromNodeId === hyperDeckNode.id && link.toNodeId === masterScreenNode.id)) {
-          links.push({
-            id: uid(),
-            fromNodeId: hyperDeckNode.id,
-            fromPortId: hyperDeckOutput.id,
-            toNodeId: masterScreenNode.id,
-            toPortId: masterScreenInput.id,
-            cableType: "hdmi",
-          });
-        }
-
+      generateSynoptic: (options) => {
+        const { nodes, links } = buildSynoptic(get());
         set({
           // Les positions de départ sont indicatives : on range les cartes selon leurs largeurs réelles.
           synopticNodes: computeSynopticAutoLayout(nodes, links),
           synopticLinks: links,
-          viewMode: "synoptic",
+          ...(options?.show === false ? {} : { viewMode: "synoptic" as const }),
         });
       },
 
@@ -904,20 +907,24 @@ export const useStudio = create<StudioState>()(
         return nextNodes;
       },
 
-      resetBoard: () =>
+      resetBoard: () => {
+        const catalog = get().catalog;
+        const items = seedItems(catalog);
+        const { nodes, links } = buildSynoptic({ items, catalog });
         set({
-          items: seedItems(get().catalog),
+          items,
           selectedId: null,
           selectedIds: [],
           camera: { x: 80, y: 40, zoom: 1 },
-          title: "Plateau — Interview studio",
+          title: "Nouveau projet",
           status: "prep",
           viewMode: "plan",
-          synopticNodes: [],
-          synopticLinks: [],
+          synopticNodes: computeSynopticAutoLayout(nodes, links),
+          synopticLinks: links,
           planBackground: null,
           planBackgroundEditing: false,
-        }),
+        });
+      },
     }),
     {
       name: "shotboard-studio",
