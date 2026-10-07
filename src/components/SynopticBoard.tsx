@@ -874,12 +874,6 @@ export function SynopticBoard() {
         >
           {/* Lignes de câblage SVG */}
           <svg className="pointer-events-none absolute inset-0 z-10 h-full w-full overflow-visible" aria-hidden="true">
-            <defs>
-              <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-                <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#000" floodOpacity="0.15" />
-              </filter>
-            </defs>
-
             {links.map((link) => {
               const start = getPortCoordinates(link.fromNodeId, link.fromPortId, true, link.cableType);
               const end = getPortCoordinates(link.toNodeId, link.toPortId, false, link.cableType);
@@ -914,6 +908,17 @@ export function SynopticBoard() {
                       strokeLinecap="round"
                     />
                   )}
+                  {/* Ombre portée : un second tracé décalé. Un filtre SVG ferait disparaître les câbles
+                      parfaitement horizontaux (boîte englobante de hauteur nulle). */}
+                  <path
+                    d={pathD}
+                    fill="none"
+                    stroke="#000"
+                    strokeOpacity="0.22"
+                    strokeWidth={isSelected ? "5.5" : "4.5"}
+                    strokeLinecap="round"
+                    transform="translate(0 2)"
+                  />
                   {/* Câble principal */}
                   <path
                     d={pathD}
@@ -921,7 +926,6 @@ export function SynopticBoard() {
                     stroke={cableCfg.color}
                     strokeWidth={isSelected ? "4.5" : "3.5"}
                     strokeLinecap="round"
-                    filter="url(#shadow)"
                   />
                   {/* Point de connexion de départ */}
                   <circle cx={start.x} cy={start.y} r="4" fill={cableCfg.color} />
