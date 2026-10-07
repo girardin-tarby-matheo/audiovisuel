@@ -699,3 +699,9 @@ html[data-theme="light"] .beam-cone {
   --t: var(--tint);
   filter: saturate(1.7) brightness(0.93);
 }
+
+/* Voile derrière les fenêtres : en thème clair, « black » est redéfini en gris clair (tuiles),
+   donc on impose un vrai voile sombre. */
+html[data-theme="light"] .fixed[class*="bg-black/"] {
+  background-color: rgb(15 23 42 / 0.5) !important;
+}

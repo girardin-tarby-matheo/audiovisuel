@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage, type StateStorage } from "zustand/middleware";
 import { CATALOG, CATALOG_MAP } from "../lib/catalog";
 import { SYNOPTIC_TEMPLATES } from "../lib/synopticTemplates";
 import { GRID_SIZE } from "../lib/constants";
@@ -10,6 +10,37 @@ const uid = () =>
   typeof crypto !== "undefined" && crypto.randomUUID
     ? crypto.randomUUID()
     : `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+let storageWarned = false;
+
+/** Stockage tolérant : un navigateur plein ou bloqué ne doit jamais faire échouer une action. */
+const safeStorage: StateStorage = {
+  getItem: (key) => {
+    try {
+      return window.localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  setItem: (key, value) => {
+    try {
+      window.localStorage.setItem(key, value);
+    } catch {
+      if (!storageWarned) {
+        storageWarned = true;
+        // useStudio n'existe pas encore à l'import : on prévient à la première erreur réelle.
+        queueMicrotask(() => useStudio.getState().setToast("Stockage du navigateur plein : exportez votre projet en JSON pour ne rien perdre"));
+      }
+    }
+  },
+  removeItem: (key) => {
+    try {
+      window.localStorage.removeItem(key);
+    } catch {
+      /* stockage indisponible */
+    }
+  },
+};
 
 const DEFAULT_VISIBLE_LAYERS = { video: true, audio: true, accessories: true, lights: true } as const;
 
@@ -890,6 +921,7 @@ export const useStudio = create<StudioState>()(
     }),
     {
       name: "shotboard-studio",
+      storage: createJSONStorage(() => safeStorage),
       version: 6,
       migrate: (persistedState: any, version: number) => {
         let state = persistedState;
