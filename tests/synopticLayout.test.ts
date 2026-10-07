@@ -28,7 +28,7 @@ test("l'auto-layout ne fait chevaucher aucune carte, même départ tous superpos
     ] as any;
 
     const placed = computeSynopticAutoLayout(nodes, links);
-    const box = (n: any) => ({ left: n.x, right: n.x + synopticNodeWidth(n), top: n.y, bottom: n.y + (n.height ?? Math.max(140, 61 + Math.max(n.portsIn.length, n.portsOut.length, 1) * 32)) });
+    const box = (n: any) => ({ left: n.x, right: n.x + synopticNodeWidth(n), top: n.y, bottom: n.y + (n.height ?? Math.max(156, 61 + Math.max(n.portsIn.length, n.portsOut.length, 1) * 32)) });
 
     for (let a = 0; a < placed.length; a += 1) {
         for (let b = a + 1; b < placed.length; b += 1) {

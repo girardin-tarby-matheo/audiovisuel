@@ -4,14 +4,6 @@ import {
   Plus,
   Trash2,
   Zap,
-  Radio,
-  Sliders,
-  Tv,
-  Laptop,
-  Disc,
-  Headphones,
-  Mic,
-  Video,
   Layers,
   ZoomIn,
   ZoomOut,
@@ -24,6 +16,7 @@ import {
 import { useStudio } from "../store/studioStore";
 import { VisualAsset } from "./VisualAsset";
 import { ItemGlyph } from "./ItemGlyph";
+import { DeviceIllustration } from "./DeviceIllustration";
 import { CATEGORIES } from "../lib/catalog";
 import { ValidationPanel } from "./ValidationPanel";
 import { CABLE_COLORS } from "../lib/constants";
@@ -226,29 +219,44 @@ export function SynopticBoard() {
   const dragRef = useRef<DragState | null>(null);
   const marqueeRef = useRef<MarqueeState | null>(null);
 
+  // Position verticale de chaque port, en coordonnées du tableau. Elle est mesurée par rapport à sa carte
+  // et divisée par l'échelle réelle affichée : indépendante du pan, du zoom et des animations en cours.
+  // On re-mesure quand une carte change de taille (retour à la ligne, police chargée…).
+  const nodesRef = useRef(nodes);
+  nodesRef.current = nodes;
   useLayoutEffect(() => {
     const board = containerRef.current;
     if (!board) return;
-    const boardRect = board.getBoundingClientRect();
-    const measured = new Map<string, { x: number; y: number }>();
 
-    nodes.forEach((node) => {
-      const width = synopticNodeWidth(node);
-      [...(node.portsIn ?? []).map((port) => ({ port, isOut: false })), ...(node.portsOut ?? []).map((port) => ({ port, isOut: true }))].forEach(({ port, isOut }) => {
-        const direction = isOut ? "out" : "in";
-        const element = document.querySelector<HTMLElement>(`[data-synoptic-node="${node.id}"][data-synoptic-port="${port.id}"][data-synoptic-direction="${direction}"]`);
-        if (!element) return;
-        const rect = element.getBoundingClientRect();
-        measured.set(`${node.id}:${direction}:${port.id}`, {
-          x: isOut ? node.x + width : node.x,
-          y: (rect.top + rect.height / 2 - boardRect.top - pan.y) / zoom,
+    const measure = () => {
+      const measured = new Map<string, { x: number; y: number }>();
+      nodesRef.current.forEach((node) => {
+        const width = synopticNodeWidth(node);
+        [...(node.portsIn ?? []).map((port) => ({ port, isOut: false })), ...(node.portsOut ?? []).map((port) => ({ port, isOut: true }))].forEach(({ port, isOut }) => {
+          const direction = isOut ? "out" : "in";
+          const element = board.querySelector<HTMLElement>(`[data-synoptic-node="${node.id}"][data-synoptic-port="${port.id}"][data-synoptic-direction="${direction}"]`);
+          const card = element?.closest<HTMLElement>(".synoptic-card");
+          if (!element || !card || !card.offsetWidth) return;
+          const cardRect = card.getBoundingClientRect();
+          const scale = cardRect.width / card.offsetWidth || 1;
+          const rect = element.getBoundingClientRect();
+          measured.set(`${node.id}:${direction}:${port.id}`, {
+            x: isOut ? node.x + width : node.x,
+            y: node.y + (rect.top + rect.height / 2 - cardRect.top) / scale,
+          });
         });
       });
-    });
+      setPortCoordinates((previous) => {
+        if (previous.size === measured.size && [...measured].every(([key, value]) => previous.get(key)?.y === value.y && previous.get(key)?.x === value.x)) return previous;
+        return measured;
+      });
+    };
 
-    setPortCoordinates(measured);
-  // Coordonnées en espace board : indépendantes du pan/zoom, inutile de re-mesurer à chaque déplacement.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    measure();
+    const observer = new ResizeObserver(measure);
+    board.querySelectorAll(".synoptic-card").forEach((card) => observer.observe(card));
+    void document.fonts?.ready.then(measure);
+    return () => observer.disconnect();
   }, [nodes]);
 
   useEffect(() => {
@@ -1043,7 +1051,7 @@ export const DeviceNodeCard = memo(function DeviceNodeCard({
   const portsIn = node.portsIn ?? [];
   const portsOut = node.portsOut ?? [];
   const portCount = Math.max(portsIn.length, portsOut.length, 1);
-  const cardHeight = node.height ?? Math.max(140, 61 + portCount * 32);
+  const cardHeight = node.height ?? Math.max(156, 61 + portCount * 32);
 
   const onTitleChange = (e: ChangeEvent<HTMLInputElement>) => onUpdate(node.id, { title: e.target.value });
   const onSubtitleChange = (e: ChangeEvent<HTMLInputElement>) => onUpdate(node.id, { subtitle: e.target.value });
@@ -1115,7 +1123,7 @@ export const DeviceNodeCard = memo(function DeviceNodeCard({
       </div>
 
       {/* Colonnes IN / Centre (Visuel) / OUT */}
-      <div className="relative grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_96px_minmax(0,1fr)] items-stretch gap-1 p-2">
+      <div className="relative grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_120px_minmax(0,1fr)] items-stretch gap-1 p-2">
         {/* Colonne IN (Gauche) */}
         <div className="min-w-0 flex flex-col text-[10px]">
           {portsIn.length > 0 && (
@@ -1152,11 +1160,11 @@ export const DeviceNodeCard = memo(function DeviceNodeCard({
             image={node.image}
             fit="contain"
             background={node.background}
-            className="h-20 w-24 shrink-0"
+            className="h-[5.6rem] w-[7.5rem] shrink-0"
             alt={node.title}
             fallback={node.category
               ? <ItemGlyph category={node.category} catalogId={node.visualKey ?? ""} color={node.color} size={42} />
-              : <DeviceIllustration deviceType={node.deviceType ?? "generic"} />}
+              : <DeviceIllustration deviceType={node.deviceType ?? "generic"} title={node.title} color={node.color} />}
           />
           {node.warningBadge && (
             <div className="mt-2 flex items-center gap-1 rounded bg-rose-400/15 px-1.5 py-0.5 text-[8.5px] font-bold text-rose-200">
@@ -1205,67 +1213,3 @@ export const DeviceNodeCard = memo(function DeviceNodeCard({
   );
 }
 )
-
-function DeviceIllustration({ deviceType }: { deviceType: SynopticDeviceType }) {
-  switch (deviceType) {
-    case "mixer":
-      return (
-        <div className="flex flex-col items-center gap-1">
-          <div className="flex h-16 w-28 items-center justify-center rounded border border-slate-400 bg-slate-800 p-1 text-slate-300 shadow-inner">
-            <div className="grid grid-cols-4 gap-1 w-full">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className={`h-2.5 rounded-xs ${i === 0 ? "bg-red-500" : "bg-slate-600"}`} />
-              ))}
-            </div>
-          </div>
-          <span className="text-[9px] font-bold text-slate-500">ATEM Mini</span>
-        </div>
-      );
-    case "audio":
-      return (
-        <div className="flex flex-col items-center gap-1">
-          <div className="flex h-20 w-24 flex-col justify-between rounded border border-slate-400 bg-blue-950 p-1 text-blue-200 shadow-inner">
-            <div className="flex justify-around">
-              <span className="h-2 w-2 rounded-full bg-blue-400" />
-              <span className="h-2 w-2 rounded-full bg-blue-400" />
-              <span className="h-2 w-2 rounded-full bg-blue-400" />
-            </div>
-            <div className="flex justify-around">
-              <div className="h-8 w-1.5 rounded-full bg-slate-600 flex items-end">
-                <div className="h-3 w-full bg-[#f87171]" />
-              </div>
-              <div className="h-8 w-1.5 rounded-full bg-slate-600 flex items-end">
-                <div className="h-4 w-full bg-white" />
-              </div>
-              <div className="h-8 w-1.5 rounded-full bg-slate-600 flex items-end">
-                <div className="h-5 w-full bg-white" />
-              </div>
-            </div>
-          </div>
-          <span className="text-[9px] font-bold text-slate-500">Mixer Audio</span>
-        </div>
-      );
-    case "camera":
-      return <Video size={28} className="text-cyan-400" />;
-    case "mic":
-      return <Mic size={24} className="text-blue-400" />;
-    case "screen":
-      return <Tv size={28} className="text-amber-300" />;
-    case "computer":
-      return <Laptop size={28} className="text-emerald-400" />;
-    case "recorder":
-      return <Disc size={28} className="text-rose-400" />;
-    case "headphone":
-      return <Headphones size={26} className="text-pink-600" />;
-    case "di":
-      return (
-        <div className="flex h-8 w-12 items-center justify-center rounded border border-slate-500 bg-slate-700 text-[8px] font-bold text-white shadow-xs">
-          DI BOX
-        </div>
-      );
-    case "converter":
-      return <Layers size={24} className="text-purple-600" />;
-    default:
-      return <Radio size={24} className="text-slate-400" />;
-  }
-}

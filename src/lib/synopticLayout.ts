@@ -5,7 +5,7 @@ export function synopticNodeWidth(node: SynopticNode): number {
     const portNames = [...(node.portsIn ?? []), ...(node.portsOut ?? [])].map((port) => port.name.length);
     const longestPort = Math.max(...portNames, 10);
     const sideWidth = Math.min(170, Math.max(120, longestPort * 6.2 + 34));
-    return Math.max(node.width ?? 0, minimum, 96 + sideWidth * 2 + 16);
+    return Math.max(node.width ?? 0, minimum, 120 + sideWidth * 2 + 16);
 }
 
 export function computeSynopticAutoLayout(nodes: SynopticNode[], links: SynopticLink[]): SynopticNode[] {
@@ -50,7 +50,7 @@ export function computeSynopticAutoLayout(nodes: SynopticNode[], links: Synoptic
     const nodeHeight = (node: SynopticNode) => {
         if (node.height) return node.height;
         const portCount = Math.max(node.portsIn?.length ?? 0, node.portsOut?.length ?? 0, 1);
-        return Math.max(140, 61 + portCount * 32);
+        return Math.max(156, 61 + portCount * 32);
     };
     const columns = new Map<number, SynopticNode[]>();
 
