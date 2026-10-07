@@ -646,7 +646,7 @@ export function SynopticBoard() {
           <button
             type="button"
             onClick={() => setShowAddMenu(!showAddMenu)}
-            className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-violet-700 active:scale-95"
+            className="btn btn-violet"
           >
             <Plus size={14} />
             Ajouter
@@ -743,7 +743,7 @@ export function SynopticBoard() {
             Libellé
             <input value={selectedLink.label ?? ""} onChange={(event) => updateSynopticLink(selectedLink.id, { label: event.target.value || undefined })} placeholder="Ex. Caméra 1 → ATEM" className="mt-1 w-full rounded-lg border border-white/10 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-violet-500" />
           </label>
-          <button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.preventDefault(); event.stopPropagation(); removeSynopticLink(selectedLink.id); setSelectedLinkId(null); }} className="mt-3 flex w-full items-center justify-center rounded-lg bg-red-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-red-700">Supprimer le lien</button>
+          <button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.preventDefault(); event.stopPropagation(); removeSynopticLink(selectedLink.id); setSelectedLinkId(null); }} className="mt-3 flex w-full items-center justify-center rounded-lg bg-red-600 px-2 py-1.5 text-xs font-semibold text-[#fff] hover:bg-red-700">Supprimer le lien</button>
         </div>
       )}
 
@@ -849,7 +849,7 @@ export function SynopticBoard() {
               <button
                 type="button"
                 onClick={() => generateSynoptic()}
-                className="rounded-xl bg-violet-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-700"
+                className="btn btn-violet"
               >
                 Générer depuis le plan
               </button>
@@ -974,7 +974,7 @@ export function SynopticBoard() {
                       setSelectedLinkId(null);
                       setToast("Câble supprimé");
                     }}
-                    className="absolute flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white shadow-lg transition hover:scale-110"
+                    className="absolute flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-[#fff] shadow-lg transition hover:scale-110"
                     title="Supprimer ce câble"
                   >
                     <X size={12} />
@@ -1076,7 +1076,7 @@ export const DeviceNodeCard = memo(function DeviceNodeCard({
       {node.needsPower && (
         <div
           onClick={() => onTogglePower(node.id)}
-          className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-[9px] font-bold text-white shadow-md cursor-pointer hover:bg-red-700"
+          className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-[9px] font-bold text-[#fff] shadow-md cursor-pointer hover:bg-red-700"
           title="Nécessite une alimentation secteur (cliquez pour basculer)"
         >
           <Zap size={10} fill="currentColor" />

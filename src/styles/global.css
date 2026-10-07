@@ -635,6 +635,17 @@ html[data-theme="light"] .item-label {
     border-color: transparent;
     box-shadow: 0 6px 18px rgb(245 185 66 / 0.25);
   }
+  .btn-violet {
+    border-color: rgb(255 255 255 / 0.2);
+    background: linear-gradient(180deg, #8b5cf6, #7c3aed);
+    color: #fff;
+    box-shadow: 0 6px 16px rgb(124 58 237 / 0.32), inset 0 1px 0 rgb(255 255 255 / 0.22);
+  }
+  .btn-violet:hover {
+    border-color: rgb(255 255 255 / 0.3);
+    background: linear-gradient(180deg, #a78bfa, #8b5cf6);
+    box-shadow: 0 8px 20px rgb(124 58 237 / 0.42), inset 0 1px 0 rgb(255 255 255 / 0.3);
+  }
   .btn-accent {
     border-color: rgb(245 185 66 / 0.35);
     background: rgb(245 185 66 / 0.1);
