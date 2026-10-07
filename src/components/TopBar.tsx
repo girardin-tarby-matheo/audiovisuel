@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { Download, Share2, Clapperboard, RotateCcw, Loader2, Check, LayoutDashboard, Network, FolderOpen, Undo2, Redo2, Sun, Moon, PanelLeft, PanelRight, Keyboard } from "lucide-react";
+import { Download, Share2, Clapperboard, RotateCcw, Loader2, Check, LayoutDashboard, Network, FolderOpen, Undo2, Redo2, Sun, Moon, PanelLeft, PanelRight, Keyboard, Boxes, Zap, Weight, Sparkles } from "lucide-react";
 import { toPng } from "html-to-image";
 import { useStudio } from "../store/studioStore";
 import { encodeShare } from "../lib/shareImport";
@@ -125,14 +125,21 @@ export function TopBar({ onOpenProjects, onOpenShortcuts, panels }: { onOpenProj
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
-        <div className="tooltip-trigger">
-          <span className="hidden cursor-default text-[11px] text-slate-500 md:inline">
-            {items.length} objet{items.length !== 1 ? "s" : ""}
+        <div className="hidden items-center divide-x divide-white/8 overflow-hidden rounded-xl border border-white/8 bg-white/[0.03] text-[11px] font-medium text-slate-300 md:flex" aria-label="Récapitulatif du plateau">
+          <span className="flex items-center gap-1.5 px-2.5 py-1.5" title="Objets sur le plateau">
+            <Boxes size={13} className="text-slate-400" />
+            {items.length}<span className="hidden xl:inline text-slate-400">objet{items.length !== 1 ? "s" : ""}</span>
           </span>
-          <span className="tooltip-text">Éléments sur le plateau</span>
-        </div>
-        <div className="hidden text-[10px] text-slate-500 lg:block" title="Charge calculée à partir des fiches techniques">
-          {totalPower > 0 ? `${totalPower} W` : "— W"} · {totalWeight > 0 ? `${totalWeight.toFixed(1)} kg` : "— kg"}
+          {totalPower > 0 && (
+            <span className="flex items-center gap-1.5 px-2.5 py-1.5" title="Consommation totale, d'après les fiches techniques">
+              <Zap size={13} className="text-amber-300" />{totalPower} W
+            </span>
+          )}
+          {totalWeight > 0 && (
+            <span className="hidden items-center gap-1.5 px-2.5 py-1.5 lg:flex" title="Poids total, d'après les fiches techniques">
+              <Weight size={13} className="text-cyan-300" />{totalWeight.toFixed(1)} kg
+            </span>
+          )}
         </div>
 
         <div className="flex rounded-xl border border-white/8 bg-white/[0.03] p-0.5" aria-label="Mode de travail">
@@ -191,10 +198,10 @@ export function TopBar({ onOpenProjects, onOpenShortcuts, panels }: { onOpenProj
             useStudio.getState().setEditingCatalogItemId(null);
             useStudio.getState().setCatalogModalOpen(true);
           }}
-          className="flex items-center gap-1.5 rounded-xl border border-white/8 bg-white/5 px-2.5 py-2 text-xs text-amber-200 hover:bg-white/10 hover:border-amber-400/30 transition"
+          className="btn btn-accent"
           title="Personnaliser les objets & la bibliothèque"
         >
-          <span className="text-amber-300">✨</span>
+          <Sparkles size={14} />
           <span className="hidden sm:inline">Objets</span>
         </button>
 

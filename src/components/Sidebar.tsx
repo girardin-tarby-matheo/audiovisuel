@@ -59,10 +59,10 @@ export function Sidebar() {
   return (
     <aside className="panel-glass flex w-[280px] shrink-0 flex-col">
       <div className="border-b border-white/6 px-4 py-3.5 space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
             <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-cyan-200/70">Bibliothèque</p>
-            <h2 className="text-sm font-semibold text-white">Éléments de tournage</h2>
+            <h2 className="text-[15px] font-semibold leading-tight text-white">Éléments de tournage</h2>
           </div>
           <button
             type="button"
@@ -70,11 +70,11 @@ export function Sidebar() {
               setEditingCatalogItemId(null);
               setCatalogModalOpen(true);
             }}
-            className="flex items-center gap-1.5 rounded-xl border border-amber-400/30 bg-amber-400/10 px-2.5 py-1.5 text-[11px] font-semibold text-amber-200 hover:bg-amber-400/20 hover:border-amber-400/50 transition active:scale-95"
+            className="btn btn-accent shrink-0 p-2"
             title="Personnaliser les photos, noms et paramètres des objets"
+            aria-label="Personnaliser les objets de la bibliothèque"
           >
-            <Sparkles size={13} className="text-amber-300" />
-            <span>Personnaliser</span>
+            <Sparkles size={15} />
           </button>
         </div>
 

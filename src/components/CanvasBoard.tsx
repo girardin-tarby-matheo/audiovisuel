@@ -18,14 +18,36 @@ type MarqueeState = {
   additive: boolean;
 };
 
-function Minimap() {
-  const itemsMap = useStudio((s) => s.items);
-  const items = useMemo(() => Object.values(itemsMap), [itemsMap]);
-  const camera = useStudio((s) => s.camera);
-  const selectedId = useStudio((s) => s.selectedId);
+const MINIMAP_COLORS: Record<string, string> = {
+  camera: "#5eead4",
+  light: "#f5b942",
+  audio: "#4ade80",
+  grip: "#c084fc",
+  talent: "#a78bfa",
+  set: "#94a3b8",
+};
 
-  const size = 160;
-  const padding = 40;
+/** Mini-carte : aperçu du plateau, zone visible et navigation (clic ou glisser pour recentrer la vue). */
+function Minimap() {
+  const items = useStudio((s) => s.items);
+  const camera = useStudio((s) => s.camera);
+  const selectedIds = useStudio((s) => s.selectedIds);
+  const setCamera = useStudio((s) => s.setCamera);
+  const [view, setView] = useState({ width: 0, height: 0 });
+  const dragging = useRef(false);
+
+  useEffect(() => {
+    const board = document.getElementById("board-export");
+    if (!board) return;
+    const update = () => setView({ width: board.clientWidth, height: board.clientHeight });
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(board);
+    return () => observer.disconnect();
+  }, []);
+
+  const size = 168;
+  const padding = 120;
 
   const bounds = useMemo(() => {
     if (!items.length) return { minX: 0, minY: 0, maxX: 1000, maxY: 700 };
@@ -39,8 +61,8 @@ function Minimap() {
     };
   }, [items]);
 
-  const rangeX = Math.max(bounds.maxX - bounds.minX, 200);
-  const rangeY = Math.max(bounds.maxY - bounds.minY, 200);
+  const rangeX = Math.max(bounds.maxX - bounds.minX, 300);
+  const rangeY = Math.max(bounds.maxY - bounds.minY, 300);
   const aspect = rangeX / rangeY;
   const w = aspect >= 1 ? size : size * aspect;
   const h = aspect >= 1 ? size / aspect : size;
@@ -48,33 +70,89 @@ function Minimap() {
   const mapX = (x: number) => ((x - bounds.minX) / rangeX) * w;
   const mapY = (y: number) => ((y - bounds.minY) / rangeY) * h;
 
+  const viewport = {
+    x: mapX(-camera.x / camera.zoom),
+    y: mapY(-camera.y / camera.zoom),
+    width: (view.width / camera.zoom / rangeX) * w,
+    height: (view.height / camera.zoom / rangeY) * h,
+  };
+
+  const recenter = (event: ReactPointerEvent<SVGSVGElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const worldX = bounds.minX + ((event.clientX - rect.left) / rect.width) * rangeX;
+    const worldY = bounds.minY + ((event.clientY - rect.top) / rect.height) * rangeY;
+    const current = useStudio.getState().camera;
+    setCamera({ zoom: current.zoom, x: view.width / 2 - worldX * current.zoom, y: view.height / 2 - worldY * current.zoom });
+  };
+
   return (
     <div
-      className="minimap no-export pointer-events-auto absolute bottom-20 right-4 z-20 bg-chrome/85"
+      className="minimap no-export pointer-events-auto absolute bottom-20 right-4 z-20 hidden bg-chrome/85 md:block"
       style={{ width: w + 8, height: h + 8, padding: 4 }}
+      title="Cliquez ou glissez pour déplacer la vue"
     >
-      <svg width={w} height={h} className="block">
-        {items.map((item) => {
-          const cx = mapX(item.x);
-          const cy = mapY(item.y);
-          const isSelected = item.id === selectedId;
-          const colors: Record<string, string> = {
-            camera: "#5eead4",
-            light: "#f5b942",
-            talent: "#a78bfa",
-            set: "#94a3b8",
-          };
+      <svg
+        width={w}
+        height={h}
+        className="block cursor-crosshair overflow-hidden rounded-lg"
+        onPointerDown={(event) => {
+          event.stopPropagation();
+          dragging.current = true;
+          event.currentTarget.setPointerCapture(event.pointerId);
+          recenter(event);
+        }}
+        onPointerMove={(event) => {
+          if (dragging.current) recenter(event);
+        }}
+        onPointerUp={(event) => {
+          dragging.current = false;
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+        }}
+        onPointerCancel={() => {
+          dragging.current = false;
+        }}
+      >
+        {items.filter((item) => item.category === "set").map((item) => (
+          <rect
+            key={item.id}
+            x={mapX(item.x) - (((item.width ?? 110) / rangeX) * w) / 2}
+            y={mapY(item.y) - (((item.height ?? 60) / rangeY) * h) / 2}
+            width={((item.width ?? 110) / rangeX) * w}
+            height={((item.height ?? 60) / rangeY) * h}
+            rx={2}
+            fill={`${MINIMAP_COLORS.set}33`}
+            stroke={selectedIds.includes(item.id) ? "#f5b942" : `${MINIMAP_COLORS.set}88`}
+            strokeWidth={selectedIds.includes(item.id) ? 1.5 : 0.8}
+          />
+        ))}
+        {items.filter((item) => item.category !== "set").map((item) => {
+          const selected = selectedIds.includes(item.id);
           return (
             <circle
               key={item.id}
-              cx={cx}
-              cy={cy}
-              r={isSelected ? 4 : 2.5}
-              fill={colors[item.category] ?? "#94a3b8"}
-              opacity={isSelected ? 1 : 0.65}
+              cx={mapX(item.x)}
+              cy={mapY(item.y)}
+              r={selected ? 4 : 3}
+              fill={MINIMAP_COLORS[item.category] ?? "#94a3b8"}
+              stroke={selected ? "#fff" : "none"}
+              strokeWidth={1.2}
+              opacity={selected ? 1 : 0.85}
             />
           );
         })}
+        {view.width > 0 && (
+          <rect
+            x={viewport.x}
+            y={viewport.y}
+            width={Math.max(4, viewport.width)}
+            height={Math.max(4, viewport.height)}
+            rx={2}
+            fill="rgb(245 185 66 / 0.08)"
+            stroke="#f5b942"
+            strokeWidth={1.2}
+            pointerEvents="none"
+          />
+        )}
       </svg>
     </div>
   );
