@@ -5,10 +5,16 @@ Shotboard Studio est un outil de planification de tournage et de conception de s
 ## Fonctionnalités principales
 
 - Plateau de plan de tournage avec objets, calques, zoom et déplacement
-- Bibliothèque de filtres, éléments personnalisés et ports connectiques
-- Mode synoptique pour relier caméra, audio, mixage et écrans
-- Export PNG et partage de projet via URL
-- Gestion de projets en local et import / export JSON
+- **Fond de plan** : importez un plan de salle ou une photo derrière les objets (opacité, taille, position)
+- Noms des objets placés automatiquement sans chevauchement, et déplaçables par double-clic
+- Lumières avec faisceau réglable (rayon, ouverture, puissance) et caméras avec champ de vision
+- Alignement et répartition des objets sélectionnés
+- Annuler / rétablir (Ctrl+Z / Ctrl+Y) pour le plan, le synoptique et le fond de plan
+- Mode synoptique pour relier caméra, audio, mixage et écrans, avec validation en direct
+- Thème clair ou sombre (bouton soleil / lune)
+- Export PNG, export / import JSON et bibliothèque de projets enregistrés dans le navigateur
+- **Partage par lien** : le projet est compressé dans l'adresse ; la page de partage affiche un aperçu du plan et permet de l'ouvrir dans l'éditeur (votre projet actuel est sauvegardé avant)
+- Raccourcis clavier : touche **?** pour l'aide
 
 ## Démarrage rapide
 
@@ -21,6 +27,7 @@ npm run dev -- --host 0.0.0.0 --port 4321
 
 ```bash
 npm run dev
+npm test
 npm run build
 npm run preview -- --host 0.0.0.0 --port 4321
 ```

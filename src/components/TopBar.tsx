@@ -200,9 +200,12 @@ export function TopBar({ onOpenProjects, onOpenShortcuts, panels }: { onOpenProj
 
         <button
           type="button"
-          onClick={resetBoard}
+          onClick={() => {
+            if (window.confirm("Réinitialiser le plateau ? Les objets, le synoptique et le fond de plan seront remis à zéro (Ctrl+Z pour annuler).")) resetBoard();
+          }}
           className="rounded-xl border border-white/8 p-2 text-slate-400 transition-all hover:rotate-[-45deg] hover:text-white"
           title="Réinitialiser le plateau"
+          aria-label="Réinitialiser le plateau"
         >
           <RotateCcw size={16} />
         </button>
@@ -211,6 +214,8 @@ export function TopBar({ onOpenProjects, onOpenShortcuts, panels }: { onOpenProj
           type="button"
           onClick={share}
           disabled={shareState !== "idle"}
+          aria-label="Copier le lien de partage"
+          title="Copier le lien de partage"
           className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-all duration-200 ${shareState === "done"
             ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
             : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/8"
@@ -230,6 +235,8 @@ export function TopBar({ onOpenProjects, onOpenShortcuts, panels }: { onOpenProj
           type="button"
           onClick={exportPng}
           disabled={exportState !== "idle"}
+          aria-label="Exporter en PNG"
+          title="Exporter en PNG"
           className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200 ${exportState === "done"
             ? "bg-emerald-400/90 text-ink-950"
             : exportState === "busy"
