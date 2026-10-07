@@ -4,227 +4,278 @@ import type { Category } from "../lib/types";
 type Props = { category: Category; catalogId: string; color: string; size?: number };
 
 /**
- * Pictogrammes duotones (trait + aplat translucide) partagés par le plan, la
- * bibliothèque et le synoptique : une même grammaire visuelle pour tous les objets.
+ * Pictogrammes duotones (trait + aplat translucide) partagés par le plan, la bibliothèque et
+ * le synoptique. Grille de 32, marge de 3, trait arrondi ; le trait s'épaissit en petite taille
+ * pour rester lisible dans les pions du plan.
  */
 export function ItemGlyph({ category, catalogId, color, size = 28 }: Props) {
-  const line = { fill: "none", stroke: color, strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-  const solid = { fill: `${color}2e`, stroke: color, strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  const strokeWidth = 2.25 - Math.min(0.5, Math.max(0, (size - 22) / 140));
+  const base = { stroke: color, strokeWidth, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  const line = { ...base, fill: "none" };
+  const solid = { ...base, fill: `${color}33` };
+  const strong = { ...base, fill: `${color}66` };
   const dot = { fill: color, stroke: "none" };
+  const soft = { ...line, opacity: 0.55 };
+
+  /** Buste commun aux personnes : tête + épaules. */
+  const bust = (
+    <>
+      <circle cx="16" cy="10.5" r="4.6" {...solid} />
+      <path d="M6.5 27.5c.8-5.6 4.4-8.8 9.5-8.8s8.7 3.2 9.5 8.8z" {...solid} />
+    </>
+  );
 
   const glyphs: Record<string, ReactNode> = {
+    // ── Caméras ──
     "cam-main": (
       <>
-        <rect x="4" y="10" width="16" height="12" rx="2.5" {...solid} />
-        <path d="M20 14l7-3.5v11L20 18z" {...solid} />
-        <circle cx="12" cy="16" r="3" {...line} />
-        <path d="M8 10V7.5h8V10" {...line} />
+        <path d="M8 11V7.5h8.5V11" {...line} />
+        <rect x="3.5" y="11" width="17" height="13" rx="2.5" {...solid} />
+        <path d="M20.5 14.5h3.2l4.3-3.2v13.4l-4.3-3.2h-3.2z" {...strong} />
+        <circle cx="8.5" cy="16" r="1.5" {...dot} />
+        <path d="M12.5 14.5v7" {...soft} />
       </>
     ),
     "cam-b": (
       <>
-        <rect x="5" y="11" width="14" height="11" rx="2.5" {...solid} />
-        <path d="M19 14l6-3v10.5l-6-3z" {...solid} />
-        <circle cx="12" cy="16.5" r="2.6" {...line} />
-        <circle cx="22" cy="8" r="1.4" {...dot} />
+        <rect x="5" y="7" width="19" height="12" rx="6" {...solid} />
+        <circle cx="21" cy="13" r="4.2" {...strong} />
+        <circle cx="21" cy="13" r="1.5" {...dot} />
+        <path d="M14.5 19v5M9 27.5h11M14.5 24l-4.5 3.5M14.5 24l4.5 3.5" {...line} />
       </>
     ),
     "cam-shoulder": (
       <>
-        <rect x="8" y="9" width="17" height="10" rx="2.5" {...solid} />
-        <path d="M25 11h3v6h-3" {...line} />
-        <circle cx="16" cy="14" r="2.8" {...line} />
-        <path d="M11 19v6h8l2-6M7 25h6" {...line} />
+        <rect x="5" y="10" width="17" height="9" rx="2.5" {...solid} />
+        <path d="M22 11.5h3.5v6H22z" {...strong} />
+        <path d="M25.5 12.5l3.5-1.5v8l-3.5-1.5" {...line} />
+        <path d="M8 10V7h6v3" {...line} />
+        <path d="M9 19v4.5c0 1.4 1 2.5 2.4 2.5h6.1" {...line} />
+        <circle cx="9" cy="14.5" r="1.4" {...dot} />
       </>
     ),
     "cam-drone": (
       <>
-        <rect x="12.5" y="12.5" width="7" height="7" rx="2" {...solid} />
-        <path d="M13 13l-5-5M19 13l5-5M13 19l-5 5M19 19l5 5" {...line} />
-        <circle cx="7" cy="7" r="2.6" {...line} />
-        <circle cx="25" cy="7" r="2.6" {...line} />
-        <circle cx="7" cy="25" r="2.6" {...line} />
-        <circle cx="25" cy="25" r="2.6" {...line} />
+        <path d="M12.5 12.5l-4.7-4.7M19.5 12.5l4.7-4.7M12.5 19.5l-4.7 4.7M19.5 19.5l4.7 4.7" {...line} />
+        <circle cx="6.5" cy="6.5" r="3.4" {...solid} />
+        <circle cx="25.5" cy="6.5" r="3.4" {...solid} />
+        <circle cx="6.5" cy="25.5" r="3.4" {...solid} />
+        <circle cx="25.5" cy="25.5" r="3.4" {...solid} />
+        <rect x="11.5" y="11.5" width="9" height="9" rx="3" {...strong} />
+        <circle cx="16" cy="16" r="1.9" {...dot} />
       </>
     ),
     "cam-crane": (
       <>
-        <path d="M5 26h9M9.5 26V15" {...line} />
-        <path d="M6 12l18-6" {...line} />
-        <rect x="21" y="8" width="8" height="7" rx="1.8" {...solid} />
-        <circle cx="9.5" cy="13" r="1.6" {...dot} />
+        <path d="M8.5 29.5l5-8.5 5 8.5M10.7 26h5.6" {...line} />
+        <path d="M4 18.5L23 8" {...line} />
+        <rect x="1.8" y="16.5" width="6" height="6" rx="1.4" {...strong} />
+        <circle cx="13.5" cy="13.4" r="1.9" {...dot} />
+        <rect x="21.5" y="3.5" width="8.5" height="8.5" rx="2" {...solid} />
+        <circle cx="25.7" cy="7.7" r="1.9" {...dot} />
       </>
     ),
     "cam-pov": (
       <>
-        <rect x="9" y="10" width="14" height="12" rx="3.5" {...solid} />
-        <circle cx="16" cy="16" r="3.4" {...line} />
-        <circle cx="16" cy="16" r="1" {...dot} />
-        <path d="M13 10V8h6v2" {...line} />
+        <rect x="6" y="7" width="20" height="18" rx="5" {...solid} />
+        <circle cx="16" cy="16" r="5.6" {...strong} />
+        <circle cx="16" cy="16" r="2.2" {...dot} />
+        <circle cx="22.5" cy="10.5" r="1.2" {...dot} />
       </>
     ),
+
+    // ── Lumières ──
     "light-soft": (
       <>
-        <path d="M8 8h16l3 12H5z" {...solid} />
-        <path d="M11 11h10M10 15h12" {...line} opacity={0.55} />
-        <path d="M16 20v6M11 27h10" {...line} />
+        <path d="M8.5 5.5h15l4.5 13H4z" {...solid} />
+        <path d="M11 10h10M9 14.5h14" {...soft} />
+        <path d="M16 18.5V27M10.5 28.5h11" {...line} />
       </>
     ),
     "light-led": (
       <>
-        <rect x="5" y="7" width="22" height="15" rx="2.5" {...solid} />
-        <circle cx="11" cy="12" r="1.2" {...dot} />
-        <circle cx="16" cy="12" r="1.2" {...dot} />
-        <circle cx="21" cy="12" r="1.2" {...dot} />
-        <circle cx="11" cy="17" r="1.2" {...dot} />
-        <circle cx="16" cy="17" r="1.2" {...dot} />
-        <circle cx="21" cy="17" r="1.2" {...dot} />
-        <path d="M16 22v5M11 27h10" {...line} />
+        <rect x="4" y="5.5" width="24" height="16" rx="3" {...solid} />
+        <circle cx="10.5" cy="10.5" r="1.7" {...dot} />
+        <circle cx="16" cy="10.5" r="1.7" {...dot} />
+        <circle cx="21.5" cy="10.5" r="1.7" {...dot} />
+        <circle cx="10.5" cy="16.5" r="1.7" {...dot} />
+        <circle cx="16" cy="16.5" r="1.7" {...dot} />
+        <circle cx="21.5" cy="16.5" r="1.7" {...dot} />
+        <path d="M16 21.5V27M10.5 28.5h11" {...line} />
       </>
     ),
     "light-spot": (
       <>
-        <path d="M6 12l12-4v14L6 18z" {...solid} />
-        <path d="M18 10l8-3M18 15h9M18 20l8 3" {...line} opacity={0.6} />
-        <path d="M10 18v8" {...line} />
+        <rect x="3.5" y="11" width="14" height="10" rx="2.5" {...solid} />
+        <path d="M17.5 11.5L22 8.5v15l-4.5-3z" {...strong} />
+        <path d="M25 10l3-1.8M25.5 16h3.5M25 22l3 1.8" {...line} />
+        <path d="M10.5 21v5.5M6.5 28h8" {...line} />
       </>
     ),
     "light-fresnel": (
       <>
-        <rect x="5" y="9" width="13" height="13" rx="2" {...solid} />
-        <path d="M18 10l5-3v16l-5-3z" {...solid} />
-        <path d="M26 11l2-1M26 16h3M26 21l2 1" {...line} opacity={0.6} />
-        <path d="M11 22v4M8 26h6" {...line} />
+        <rect x="2.5" y="10" width="3" height="9" rx="1" {...strong} />
+        <rect x="26.5" y="10" width="3" height="9" rx="1" {...strong} />
+        <circle cx="16" cy="14.5" r="9" {...solid} />
+        <circle cx="16" cy="14.5" r="5.2" {...line} />
+        <circle cx="16" cy="14.5" r="1.8" {...dot} />
+        <path d="M16 23.5V27M11 28.5h10" {...line} />
       </>
     ),
     "light-tube": (
       <>
-        <rect x="4" y="13" width="24" height="6" rx="3" {...solid} />
-        <path d="M9 16h14" stroke="#fff" strokeWidth="1.4" strokeLinecap="round" opacity={0.7} />
+        <rect x="3" y="11.5" width="26" height="9" rx="4.5" {...solid} />
+        <path d="M8 16h16" stroke="#fff" strokeWidth={strokeWidth * 0.8} strokeLinecap="round" opacity={0.75} />
+        <path d="M7.5 11.5v-3M24.5 11.5v-3M7.5 20.5v3M24.5 20.5v3" {...soft} />
       </>
     ),
     "light-practical": (
       <>
-        <path d="M10 6h12l3 10H7z" {...solid} />
-        <path d="M16 16v8M11 26h10" {...line} />
+        <path d="M9.5 4.5h13l4 11h-21z" {...solid} />
+        <circle cx="16" cy="10.5" r="2" {...dot} />
+        <path d="M16 15.5V25" {...line} />
+        <rect x="10.5" y="25" width="11" height="3.5" rx="1.7" {...strong} />
       </>
     ),
+
+    // ── Grip ──
     "grip-cstand": (
       <>
-        <path d="M16 6v19M16 25l-7 3M16 25l7 3M16 25v3.5" {...line} />
-        <path d="M16 9h8" {...line} />
-        <circle cx="25" cy="9" r="2.4" {...solid} />
+        <path d="M16 4v19M16 23L7 29M16 23l9 6M16 23v6" {...line} />
+        <path d="M16 9.5h8.5" {...line} />
+        <circle cx="26.5" cy="9.5" r="2.8" {...strong} />
+        <circle cx="16" cy="9.5" r="1.5" {...dot} />
       </>
     ),
     "grip-flag": (
       <>
-        <path d="M8 4v24" {...line} />
-        <rect x="10" y="6" width="15" height="12" rx="1" {...solid} />
-        <path d="M5 28h6" {...line} />
+        <path d="M7.5 4v24M3.5 28.5h8" {...line} />
+        <rect x="9.5" y="5.5" width="17" height="13" rx="1.5" {...solid} />
+        <path d="M13 18.5l6-13M19 18.5l6-13" {...soft} />
       </>
     ),
     "grip-butterfly": (
       <>
-        <rect x="5" y="6" width="22" height="16" rx="1.5" {...solid} />
-        <path d="M5 6l22 16M27 6L5 22" {...line} opacity={0.4} />
-        <path d="M16 22v5M11 27h10" {...line} />
+        <rect x="4" y="4.5" width="24" height="15" rx="1.8" {...solid} />
+        <rect x="7.5" y="8" width="17" height="8" rx="0.8" {...soft} />
+        <circle cx="4" cy="4.5" r="1.4" {...dot} />
+        <circle cx="28" cy="4.5" r="1.4" {...dot} />
+        <circle cx="4" cy="19.5" r="1.4" {...dot} />
+        <circle cx="28" cy="19.5" r="1.4" {...dot} />
+        <path d="M16 19.5V28M10 29h12" {...line} />
       </>
     ),
+
+    // ── Audio ──
     "audio-boom": (
       <>
-        <path d="M4 26l17-14" {...line} />
-        <rect x="19" y="6" width="9" height="7" rx="3.5" transform="rotate(30 23.5 9.5)" {...solid} />
-        <circle cx="5" cy="25" r="1.8" {...dot} />
+        <path d="M4.5 27.5L20 11" {...line} />
+        <rect x="19" y="3" width="8" height="15" rx="4" transform="rotate(40 23 10.5)" {...strong} />
+        <path d="M21.5 8.5l5 4.6" stroke="#fff" strokeWidth={strokeWidth * 0.7} strokeLinecap="round" opacity={0.6} />
+        <circle cx="5" cy="27" r="2" {...dot} />
       </>
     ),
     "audio-lav": (
       <>
-        <rect x="12.5" y="6" width="7" height="12" rx="3.5" {...solid} />
-        <path d="M9 14a7 7 0 0 0 14 0M16 21v5M11 26h10" {...line} />
+        <circle cx="16" cy="9.5" r="4.8" {...strong} />
+        <rect x="12.5" y="14.5" width="7" height="5" rx="1.5" {...solid} />
+        <path d="M16 19.5c0 3-5 3.5-5 6.5 0 2 2 2.8 5 2.8" {...line} />
       </>
     ),
     "audio-stand": (
       <>
-        <rect x="12.5" y="4" width="7" height="11" rx="3.5" {...solid} />
-        <path d="M16 15v11M16 26l-6 3M16 26l6 3" {...line} />
-        <path d="M9 12a7 7 0 0 0 14 0" {...line} opacity={0.6} />
+        <rect x="12" y="3.5" width="8" height="12" rx="4" {...strong} />
+        <path d="M14 7.5h4M14 10.5h4" {...soft} />
+        <path d="M8.5 11.5a7.5 7.5 0 0 0 15 0" {...line} />
+        <path d="M16 19v8M16 27l-6.5 2.5M16 27l6.5 2.5M16 27v2.5" {...line} />
       </>
     ),
-    "set-table": (
-      <>
-        <path d="M4 12h24l-2 3H6z" {...solid} />
-        <path d="M7 15v11M25 15v11M10 15v6M22 15v6" {...line} />
-      </>
-    ),
-    "set-chair": (
-      <>
-        <path d="M10 5h12v10H10z" {...solid} />
-        <path d="M8 18h16v3H8zM11 21v6M21 21v6" {...line} />
-      </>
-    ),
-    "set-cyc": (
-      <>
-        <path d="M4 26V10a6 6 0 0 1 6-6h12a6 6 0 0 1 6 6v16" {...line} opacity={0.5} />
-        <path d="M4 24c5-8 19-8 24 0z" {...solid} />
-      </>
-    ),
-    "set-monitor": (
-      <>
-        <rect x="4" y="6" width="24" height="16" rx="2.5" {...solid} />
-        <path d="M11 26h10M16 22v4" {...line} />
-        <path d="M8 18l4-5 3 3 3-4 4 6" {...line} opacity={0.65} />
-      </>
-    ),
-    "set-atem-mini": (
-      <>
-        <rect x="3" y="9" width="26" height="14" rx="2.5" {...solid} />
-        <rect x="6" y="12" width="4" height="3" rx="0.8" {...dot} />
-        <rect x="12" y="12" width="4" height="3" rx="0.8" {...dot} opacity={0.6} />
-        <rect x="18" y="12" width="4" height="3" rx="0.8" {...dot} opacity={0.6} />
-        <path d="M7 19h18" {...line} opacity={0.6} />
-      </>
-    ),
-    "set-sound-desk": (
-      <>
-        <rect x="3" y="8" width="26" height="16" rx="2.5" {...solid} />
-        <path d="M9 12v8M16 12v8M23 12v8" {...line} opacity={0.55} />
-        <rect x="7.5" y="14" width="3" height="3" rx="0.8" {...dot} />
-        <rect x="14.5" y="17" width="3" height="3" rx="0.8" {...dot} />
-        <rect x="21.5" y="13" width="3" height="3" rx="0.8" {...dot} />
-      </>
-    ),
+
+    // ── Équipe ──
     "talent-director": (
       <>
-        <circle cx="16" cy="9" r="4" {...solid} />
-        <path d="M7 26c1-6 4-9 9-9s8 3 9 9" {...line} />
-        <path d="M22 4l5 2-1 4-5-2z" {...solid} />
+        {bust}
+        <path d="M10.2 11a5.8 5.8 0 0 1 11.6 0" {...line} />
+        <rect x="8.2" y="9.8" width="2.6" height="4.4" rx="1.2" {...dot} />
+        <rect x="21.2" y="9.8" width="2.6" height="4.4" rx="1.2" {...dot} />
+        <path d="M10 14.2c.3 2 1.6 3 3.6 3.2" {...line} />
       </>
     ),
     "talent-op": (
       <>
-        <circle cx="16" cy="9" r="4" {...solid} />
-        <path d="M7 26c1-6 4-9 9-9s8 3 9 9" {...line} />
-        <rect x="19" y="15" width="9" height="6" rx="1.5" {...solid} />
+        {bust}
+        <rect x="19" y="15.5" width="10" height="7" rx="1.8" {...strong} />
+        <circle cx="24" cy="19" r="1.9" {...dot} />
       </>
     ),
     "talent-actor": (
       <>
-        <circle cx="16" cy="9" r="4" {...solid} />
-        <path d="M7 26c1-6 4-9 9-9s8 3 9 9" {...line} />
-        <path d="M13 7.6l1 .8M19 7.6l-1 .8" {...line} strokeWidth={1.2} />
+        {bust}
+        <path d="M25.5 3.5l1.1 2.7 2.8 1.1-2.8 1.1-1.1 2.7-1.1-2.7-2.8-1.1 2.8-1.1z" {...dot} />
       </>
     ),
     "talent-guest": (
       <>
-        <circle cx="16" cy="9" r="4" {...solid} />
-        <path d="M7 26c1-6 4-9 9-9s8 3 9 9" {...line} />
-        <path d="M16 18l-2 4 2 4 2-4z" {...solid} />
+        {bust}
+        <path d="M16 19l-2.4 2.6L16 28.5l2.4-6.9z" {...strong} />
       </>
     ),
     "talent-extra": (
       <>
-        <circle cx="16" cy="9" r="4" {...solid} />
-        <path d="M7 26c1-6 4-9 9-9s8 3 9 9" {...line} strokeDasharray="2.5 2.5" />
+        <circle cx="16" cy="10.5" r="4.6" {...line} strokeDasharray="3 3" />
+        <path d="M6.5 27.5c.8-5.6 4.4-8.8 9.5-8.8s8.7 3.2 9.5 8.8" {...line} strokeDasharray="3 3" />
+      </>
+    ),
+
+    // ── Décors & régie ──
+    "set-table": (
+      <>
+        <rect x="2.5" y="10.5" width="27" height="5" rx="2" {...solid} />
+        <path d="M6.5 15.5v12M25.5 15.5v12M6.5 22h19" {...line} />
+      </>
+    ),
+    "set-chair": (
+      <>
+        <rect x="8" y="3.5" width="11" height="12" rx="2.5" {...solid} />
+        <rect x="7" y="15.5" width="19" height="4.5" rx="1.8" {...strong} />
+        <path d="M9.5 20v8.5M23.5 20v8.5" {...line} />
+      </>
+    ),
+    "set-cyc": (
+      <>
+        <path d="M4.5 4.5v14c0 5 4 9 9 9h14v-23z" {...solid} />
+        <path d="M10 6v10M16 6v10M22 6v10" {...soft} />
+        <path d="M4.5 4.5h23" {...line} />
+      </>
+    ),
+    "set-monitor": (
+      <>
+        <rect x="2.5" y="5.5" width="27" height="18" rx="2.8" {...solid} />
+        <rect x="5.5" y="8.5" width="21" height="12" rx="1.2" {...line} opacity={0.5} />
+        <path d="M8 16.5l4-4.5 3.2 3.3 3-4 4.8 5.2" {...line} />
+        <path d="M16 23.5v3.5M10.5 28h11" {...line} />
+      </>
+    ),
+    "set-atem-mini": (
+      <>
+        <rect x="2" y="8" width="28" height="17" rx="3.2" {...solid} />
+        <rect x="5" y="11" width="4" height="3.2" rx="0.8" {...dot} />
+        <rect x="10.5" y="11" width="4" height="3.2" rx="0.8" {...dot} opacity={0.65} />
+        <rect x="16" y="11" width="4" height="3.2" rx="0.8" {...dot} opacity={0.65} />
+        <rect x="21.5" y="11" width="4" height="3.2" rx="0.8" {...dot} opacity={0.65} />
+        <rect x="5" y="17" width="4" height="3.2" rx="0.8" {...dot} opacity={0.35} />
+        <rect x="10.5" y="17" width="4" height="3.2" rx="0.8" {...dot} opacity={0.35} />
+        <circle cx="24.5" cy="19" r="2.6" {...strong} />
+      </>
+    ),
+    "set-sound-desk": (
+      <>
+        <rect x="2" y="6" width="28" height="20" rx="3.2" {...solid} />
+        <path d="M8 10.5v11M13.5 10.5v11M19 10.5v11M24.5 10.5v11" {...soft} />
+        <rect x="6.3" y="15" width="3.4" height="3.4" rx="0.9" {...dot} />
+        <rect x="11.8" y="18" width="3.4" height="3.4" rx="0.9" {...dot} />
+        <rect x="17.3" y="12.5" width="3.4" height="3.4" rx="0.9" {...dot} />
+        <rect x="22.8" y="16" width="3.4" height="3.4" rx="0.9" {...dot} />
       </>
     ),
   };
@@ -238,11 +289,15 @@ export function ItemGlyph({ category, catalogId, color, size = 28 }: Props) {
     light: glyphs["light-soft"],
     grip: glyphs["grip-cstand"],
     audio: glyphs["audio-lav"],
-    talent: glyphs["talent-actor"],
+    talent: (
+      <>
+        {bust}
+      </>
+    ),
     set: (
       <>
-        <rect x="6" y="8" width="20" height="16" rx="3" {...solid} />
-        <path d="M6 14h20" {...line} opacity={0.5} />
+        <rect x="5" y="7" width="22" height="18" rx="3.5" {...solid} />
+        <path d="M5 14h22" {...soft} />
       </>
     ),
   };

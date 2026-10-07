@@ -157,14 +157,14 @@ export function Sidebar() {
                       }`}
                     style={{ animationDelay: `${index * 30}ms` }}
                   >
-                    <div className="relative mb-2 flex h-10 items-center justify-center overflow-hidden rounded-lg border border-white/5 transition-colors" style={{ background: `linear-gradient(135deg, ${item.color}26, ${item.color}08)` }}>
+                    <div className="relative mb-2 flex h-11 items-center justify-center overflow-hidden rounded-lg border border-white/5 transition-colors" style={{ background: `linear-gradient(135deg, ${item.color}26, ${item.color}08)` }}>
                       <VisualAsset
                         visualKey={item.visualKey ?? item.id}
                         image={item.image}
                         fit={item.fit}
                         background={item.background}
                         alt={item.name}
-                        fallback={<ItemGlyph category={item.category} catalogId={item.id} color={item.color} size={22} />}
+                        fallback={<ItemGlyph category={item.category} catalogId={item.id} color={item.color} size={27} />}
                       />
                     </div>
                     <p className="text-[12px] font-medium leading-tight text-slate-100 truncate">{item.name}</p>
