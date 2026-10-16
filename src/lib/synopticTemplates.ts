@@ -131,7 +131,7 @@ export const SYNOPTIC_TEMPLATES: Record<string, SynopticTemplate> = {
   },
   "master-screen": {
     id: "master-screen",
-    title: "Ecran Moniteur",
+    title: "Écran moniteur",
     subtitle: "Moniteur Master",
     deviceType: "screen",
     color: "#38bdf8",
@@ -143,7 +143,7 @@ export const SYNOPTIC_TEMPLATES: Record<string, SynopticTemplate> = {
   },
   "multiview-screen": {
     id: "multiview-screen",
-    title: "Ecran MultiView",
+    title: "Écran MultiView",
     subtitle: "MultiView 8 vues",
     deviceType: "screen",
     color: "#f59e0b",

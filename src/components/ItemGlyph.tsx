@@ -248,6 +248,58 @@ export function ItemGlyph({ category, catalogId, color, size = 28 }: Props) {
         <path d="M4.5 4.5h23" {...line} />
       </>
     ),
+    "set-multiview": (
+      <>
+        <rect x="2.5" y="5.5" width="27" height="18" rx="2.8" {...solid} />
+        <rect x="5.5" y="8.5" width="9.5" height="6" rx="1" {...strong} />
+        <rect x="17" y="8.5" width="9.5" height="6" rx="1" {...strong} stroke="#ef4444" />
+        <rect x="5.5" y="16.5" width="9.5" height="4" rx="1" {...soft} />
+        <rect x="17" y="16.5" width="9.5" height="4" rx="1" {...soft} />
+        <path d="M16 23.5v3.5M10.5 28h11" {...line} />
+      </>
+    ),
+    "set-hyperdeck": (
+      <>
+        <rect x="2" y="9" width="28" height="15" rx="3" {...solid} />
+        <rect x="5" y="12" width="8" height="9" rx="1.5" {...strong} />
+        <path d="M16.5 13h6M16.5 17h4" {...line} />
+        <path d="M24.5 12.5l3.2 2-3.2 2z" {...dot} />
+        <circle cx="26" cy="20.5" r="1.7" fill="#ef4444" stroke="none" />
+      </>
+    ),
+    "set-pc-stream": (
+      <>
+        <rect x="6" y="5.5" width="20" height="14" rx="2.2" {...solid} />
+        <path d="M3 23.5h26l-2 3H5z" {...strong} />
+        <circle cx="12" cy="12.5" r="1.8" fill="#ef4444" stroke="none" />
+        <path d="M16 10.5h6M16 14.5h4" {...line} />
+      </>
+    ),
+    "set-pc-atem": (
+      <>
+        <rect x="6" y="5.5" width="20" height="14" rx="2.2" {...solid} />
+        <path d="M3 23.5h26l-2 3H5z" {...strong} />
+        <rect x="9" y="8.5" width="6" height="4.5" rx="0.8" {...strong} />
+        <path d="M17 9h6M17 12.5h6M9 16h14" {...line} opacity={0.7} />
+      </>
+    ),
+    "set-headphones": (
+      <>
+        <path d="M6.5 19v-3a9.5 9.5 0 0 1 19 0v3" {...line} />
+        <rect x="3.5" y="18" width="7" height="10" rx="3" {...strong} />
+        <rect x="21.5" y="18" width="7" height="10" rx="3" {...strong} />
+      </>
+    ),
+    "set-di-box": (
+      <>
+        <rect x="3" y="8.5" width="26" height="15" rx="3" {...solid} />
+        <circle cx="10.5" cy="16" r="4.2" {...line} />
+        <circle cx="10.5" cy="16" r="1.2" {...dot} />
+        <circle cx="21" cy="12.8" r="2.1" {...strong} />
+        <circle cx="21" cy="19.6" r="2.1" {...strong} />
+        <rect x="25" y="12" width="2.2" height="8" rx="1.1" {...dot} />
+      </>
+    ),
     "set-monitor": (
       <>
         <rect x="2.5" y="5.5" width="27" height="18" rx="2.8" {...solid} />

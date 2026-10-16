@@ -51,6 +51,12 @@ export const VISUALS: Record<string, VisualDefinition> = {
   "set-monitor": { key: "set-monitor", label: "Écran de retour", category: "set" },
   "set-atem-mini": { key: "set-atem-mini", label: "ATEM Mini", category: "set" },
   "set-sound-desk": { key: "set-sound-desk", label: "Table son", category: "set" },
+  "set-multiview": { key: "set-multiview", label: "Écran MultiView", category: "set" },
+  "set-hyperdeck": { key: "set-hyperdeck", label: "HyperDeck", category: "set" },
+  "set-pc-stream": { key: "set-pc-stream", label: "PC diffusion live", category: "set" },
+  "set-pc-atem": { key: "set-pc-atem", label: "PC ATEM Studio", category: "set" },
+  "set-headphones": { key: "set-headphones", label: "Casque audio", category: "set" },
+  "set-di-box": { key: "set-di-box", label: "Boîtier d'injection", category: "set" },
 
   // Appareils du synoptique. Ces clés peuvent aussi recevoir une photo.
   camera: { key: "camera", label: "Caméra" },
