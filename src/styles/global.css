@@ -716,3 +716,11 @@ html[data-theme="light"] .beam-cone {
 html[data-theme="light"] .fixed[class*="bg-black/"] {
   background-color: rgb(15 23 42 / 0.5) !important;
 }
+
+/* Défilement sans barre visible (barre d'outils sur téléphone) */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

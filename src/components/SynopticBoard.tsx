@@ -459,7 +459,7 @@ export function SynopticBoard() {
       const mouseY = event.clientY - rect.top;
       const worldX = (mouseX - currentPan.x) / currentZoom;
       const worldY = (mouseY - currentPan.y) / currentZoom;
-      const nextZoom = Math.min(1.8, Math.max(0.3, currentZoom * (event.deltaY > 0 ? 0.92 : 1.08)));
+      const nextZoom = Math.min(1.8, Math.max(0.12, currentZoom * (event.deltaY > 0 ? 0.92 : 1.08)));
       setZoom(nextZoom);
       setPan({ x: mouseX - worldX * nextZoom, y: mouseY - worldY * nextZoom });
     };
@@ -602,7 +602,7 @@ export function SynopticBoard() {
     );
     const contentWidth = Math.max(bounds.maxX - bounds.minX, 400);
     const contentHeight = Math.max(bounds.maxY - bounds.minY, 300);
-    const nextZoom = Math.min(1.2, Math.max(0.45, Math.min(viewportWidth / contentWidth, viewportHeight / contentHeight) * 0.86));
+    const nextZoom = Math.min(1.2, Math.max(0.12, Math.min(viewportWidth / contentWidth, viewportHeight / contentHeight) * 0.86));
     setZoom(nextZoom);
     setPan({
       x: (viewportWidth - contentWidth * nextZoom) / 2 - bounds.minX * nextZoom,
@@ -631,7 +631,7 @@ export function SynopticBoard() {
     <section className="relative min-w-0 flex-1 overflow-hidden select-none bg-canvas text-slate-100">
       {/* Barre d'outils supérieure */}
       <div className="synoptic-ui absolute left-4 top-3 z-30 flex flex-wrap items-center gap-2.5">
-        <div className="rounded-xl border border-white/10 bg-ink-850/95 px-3 py-1.5 shadow-md backdrop-blur">
+        <div className="hidden rounded-xl border border-white/10 bg-ink-850/95 px-3 py-1.5 shadow-md backdrop-blur sm:block">
           <div className="flex items-center gap-2">
             <span className="h-2.5 w-2.5 rounded-full bg-violet-600 animate-pulse" />
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-100">Mode Synoptique</p>
@@ -730,6 +730,9 @@ export function SynopticBoard() {
           <AlertTriangle size={13} className="text-amber-300" /> Validation
         </button>
         <button type="button" onClick={autoLayoutAndFit} className="btn" title="Aligner automatiquement les équipements">Auto-layout</button>
+        <button type="button" onClick={() => setShowLegend((open) => !open)} aria-pressed={showLegend} className={`btn hidden sm:inline-flex ${showLegend ? "btn-accent" : ""}`} title="Afficher ou masquer la légende des câbles">
+          <Layers size={13} /> Légende
+        </button>
         {highlightedNodeIds.length > 0 && <button type="button" onClick={clearSignalTrace} className="rounded-xl border border-[#67e8f9] bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-200 shadow-sm">Effacer le flux</button>}
       </div>
       {showValidation && <ValidationPanel onClose={() => setShowValidation(false)} />}
@@ -784,12 +787,7 @@ export function SynopticBoard() {
       })()}
 
       {/* Légende des câbles : repliable */}
-      {!showLegend && (
-        <button type="button" onClick={() => setShowLegend(true)} className="synoptic-ui btn absolute right-4 top-3 z-30" title="Afficher la légende des câbles">
-          <Layers size={13} /> Légende
-        </button>
-      )}
-      {showLegend && <div className="synoptic-ui absolute right-4 top-3 z-30 rounded-2xl border border-white/10 bg-ink-850/95 p-3 shadow-lg backdrop-blur">
+      {showLegend && <div className="synoptic-ui absolute right-4 top-[4.5rem] z-30 rounded-2xl border border-white/10 bg-ink-850/95 p-3 shadow-lg backdrop-blur">
         <div className="mb-2 flex items-center justify-between gap-4">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Légende Câbles & Signaux</p>
           <button type="button" onClick={() => setShowLegend(false)} aria-label="Masquer la légende" className="rounded p-0.5 text-slate-400 hover:bg-white/10 hover:text-white"><X size={12} /></button>
@@ -828,7 +826,7 @@ export function SynopticBoard() {
       <div className="synoptic-ui absolute bottom-4 right-4 z-30 flex items-center gap-1 rounded-xl border border-white/10 bg-ink-850 p-1 shadow-md">
         <button
           type="button"
-          onClick={() => setZoom((z) => Math.max(0.4, z - 0.1))}
+          onClick={() => setZoom((z) => Math.max(0.12, Math.round((z - 0.1) * 100) / 100))}
           className="rounded-lg p-1.5 text-slate-300 hover:bg-white/10"
           title="Zoom arrière"
         >

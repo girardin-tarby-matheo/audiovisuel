@@ -105,7 +105,7 @@ export function TopBar({ onOpenProjects, onOpenShortcuts, panels }: { onOpenProj
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between gap-2 whitespace-nowrap border-b border-white/6 bg-chrome/95 px-4">
-      <div className="flex min-w-0 flex-1 items-center gap-3">
+      <div className="flex min-w-[8.5rem] flex-1 items-center gap-3">
         {panels && (
           <button type="button" onClick={panels.onToggleLibrary} aria-pressed={panels.library} title="Afficher / masquer la bibliothèque" aria-label="Afficher ou masquer la bibliothèque" className={`rounded-xl border border-white/8 p-2 transition hover:bg-white/8 hover:text-white ${panels.library ? "text-amber-200" : "text-slate-400"}`}>
             <PanelLeft size={16} />
@@ -115,16 +115,17 @@ export function TopBar({ onOpenProjects, onOpenShortcuts, panels }: { onOpenProj
           <Clapperboard size={18} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Shotboard Studio</p>
+          <p className="hidden text-[10px] uppercase tracking-[0.2em] text-slate-500 sm:block">Shotboard Studio</p>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            aria-label="Nom du projet"
             className="w-full max-w-[420px] min-w-[6rem] truncate bg-transparent text-[15px] font-semibold text-white outline-none transition-colors focus:text-amber-100"
           />
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="no-scrollbar flex min-w-0 shrink items-center gap-2 overflow-x-auto py-1 sm:shrink-0 sm:overflow-visible">
         <div className="hidden items-center divide-x divide-white/8 overflow-hidden rounded-xl border border-white/8 bg-white/[0.03] text-[11px] font-medium text-slate-300 md:flex" aria-label="Récapitulatif du plateau">
           <span className="flex items-center gap-1.5 px-2.5 py-1.5" title="Objets sur le plateau">
             <Boxes size={13} className="text-slate-400" />

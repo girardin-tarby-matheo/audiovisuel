@@ -194,7 +194,17 @@ export function CanvasBoard() {
     const board = boardRef.current;
     if (!board) return;
     const initial = useStudio.getState().camera;
-    let autoFit = initial.x === 80 && initial.y === 40;
+    // Recadrage aussi quand le cadrage enregistré montre moins de la moitié des objets
+    // (projet ouvert sur un autre écran, par exemple un téléphone).
+    const startItems = useStudio.getState().items;
+    const visibleShare = board.clientWidth && startItems.length
+      ? startItems.filter((item) => {
+        const sx = initial.x + item.x * initial.zoom;
+        const sy = initial.y + item.y * initial.zoom;
+        return sx > 0 && sx < board.clientWidth && sy > 0 && sy < board.clientHeight;
+      }).length / startItems.length
+      : 1;
+    let autoFit = (initial.x === 80 && initial.y === 40) || visibleShare < 0.5;
     let fitting = false;
 
     const fit = () => {
@@ -484,7 +494,7 @@ export function CanvasBoard() {
       <Minimap />
 
       {/* Mode indicator */}
-      <div className="no-export pointer-events-none absolute left-4 top-3 flex items-center gap-2">
+      <div className="no-export pointer-events-none absolute left-4 top-3 hidden items-center gap-2 sm:flex">
         <span
           className={`inline-block h-1.5 w-1.5 rounded-full transition-colors ${panActive ? "bg-cyan-400" : "bg-amber-300"
             }`}
