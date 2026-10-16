@@ -162,7 +162,6 @@ export function CanvasBoard() {
   const boardRef = useRef<HTMLDivElement>(null);
   const itemsMap = useStudio((s) => s.items);
   const items = useMemo(() => Object.values(itemsMap), [itemsMap]);
-  const selectedId = useStudio((s) => s.selectedId);
   const selectedIds = useStudio((s) => s.selectedIds);
   const visibleLayers = useStudio((s) => s.visibleLayers);
   const camera = useStudio((s) => s.camera);

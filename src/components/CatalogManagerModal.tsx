@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, type ChangeEvent, type DragEvent } from "react";
+import { useState, useMemo, useEffect, type DragEvent } from "react";
 import {
   X,
   Plus,
@@ -10,12 +10,9 @@ import {
   RotateCcw,
   Check,
   Sparkles,
-  Sliders,
-  Eye,
   Info,
   Zap,
   Network,
-  AlertTriangle,
 } from "lucide-react";
 import { useStudio } from "../store/studioStore";
 import { CATEGORIES } from "../lib/catalog";
@@ -64,6 +61,16 @@ const DEVICE_TYPES: { id: SynopticDeviceType; label: string }[] = [
 
 export function CatalogManagerModal() {
   const isOpen = useStudio((s) => s.isCatalogModalOpen);
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (event.key !== "Escape" || target?.closest("input, textarea, select")) return;
+      useStudio.getState().setCatalogModalOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen]);
   const setIsOpen = useStudio((s) => s.setCatalogModalOpen);
   const catalog = useStudio((s) => s.catalog);
   const editingId = useStudio((s) => s.editingCatalogItemId);
@@ -239,6 +246,9 @@ export function CatalogManagerModal() {
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/75 backdrop-blur-md animate-fade-in p-4">
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Personnalisation des objets"
         className="flex h-[90vh] max-h-[860px] w-full max-w-5xl flex-col rounded-3xl border border-white/10 bg-surface shadow-2xl overflow-hidden"
         style={{ animation: "modal-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both" }}
       >

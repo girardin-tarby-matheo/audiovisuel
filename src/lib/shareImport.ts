@@ -1,21 +1,6 @@
 /** Clé de session : un projet partagé en attente d'import dans l'éditeur. */
 export const PENDING_IMPORT_KEY = "shotboard-pending-import";
 
-const PROJECTS_KEY = "shotboard-projects";
-
-/** Ajoute un projet (JSON exporté) en tête de la bibliothèque « Projets ». */
-export function saveToProjectLibrary(name: string, data: string) {
-  try {
-    const existing = JSON.parse(window.localStorage.getItem(PROJECTS_KEY) || "[]");
-    const list = Array.isArray(existing) ? existing : [];
-    list.unshift({ id: crypto.randomUUID(), name, savedAt: new Date().toISOString(), data });
-    window.localStorage.setItem(PROJECTS_KEY, JSON.stringify(list));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /** Récupère (et retire) un projet partagé en attente, s'il y en a un. */
 export function takePendingImport(): string | null {
   try {

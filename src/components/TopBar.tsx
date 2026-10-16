@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
 import { Download, Share2, Clapperboard, RotateCcw, Loader2, Check, LayoutDashboard, Network, FolderOpen, Undo2, Redo2, Sun, Moon, PanelLeft, PanelRight, Keyboard, Boxes, Zap, Weight, Sparkles } from "lucide-react";
-import { toPng } from "html-to-image";
 import { useStudio } from "../store/studioStore";
 import { encodeShare } from "../lib/shareImport";
 import { useHistory, undo, redo } from "../store/history";
@@ -80,6 +79,7 @@ export function TopBar({ onOpenProjects, onOpenShortcuts, panels }: { onOpenProj
       return;
     }
     try {
+      const { toPng } = await import("html-to-image");
       const dataUrl = await toPng(node, {
         cacheBust: true,
         pixelRatio: 3,

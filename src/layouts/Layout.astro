@@ -3,9 +3,13 @@ import '../styles/global.css';
 
 interface Props {
   title?: string;
+  description?: string;
 }
 
-const { title = 'Shotboard Studio' } = Astro.props;
+const {
+  title = 'Shotboard Studio',
+  description = 'Plan de tournage et synoptique de câblage pour les équipes de production : caméras, lumières, son, régie.',
+} = Astro.props;
 ---
 
 <!doctype html>
@@ -16,6 +20,14 @@ const { title = 'Shotboard Studio' } = Astro.props;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#07080c" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#eef1f6" media="(prefers-color-scheme: light)" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Shotboard Studio" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
     <script is:inline>
       try {
         var theme = localStorage.getItem("shotboard-theme");

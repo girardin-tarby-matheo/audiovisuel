@@ -5,6 +5,7 @@ import { SYNOPTIC_TEMPLATES } from "../lib/synopticTemplates";
 import { GRID_SIZE } from "../lib/constants";
 import { computeSynopticAutoLayout } from "../lib/synopticLayout";
 import { connectPorts, sanitizeLinks } from "../lib/synopticLinks";
+import { safeImage, safeNumber, sanitizePlaced, sanitizeVisual } from "../lib/projectSanitize";
 import type { PlanBackground, BoardLayer, BoardObject, BoardStatus, CableType, CameraView, CatalogItem, SynopticLink, SynopticNode, ToolMode, ViewMode } from "../lib/types";
 
 const uid = () =>
@@ -185,8 +186,6 @@ function buildSynoptic(state: { items: BoardObject[]; catalog: CatalogItem[] }):
 
       if (aval.linkFrom) {
         const fromId = aval.linkFrom === "hyperdeck-ref" ? hyperDeckNodeId : aval.linkFrom;
-        const fromTemplate = SYNOPTIC_TEMPLATES[aval.linkFrom === "hyperdeck-ref" ? "hyperdeck" : (aval.linkFrom === atemId ? "atem-mini-expert" : "yamaha-mg12xu")];
-
         // Note: simplified port lookup for brevity in the logic
         links.push({
           id: uid(),
@@ -867,19 +866,46 @@ export const useStudio = create<StudioState>()(
       importProject: (json) => {
         try {
           const data = JSON.parse(json);
+          if (!data || typeof data !== "object") throw new Error("Projet illisible");
+          // Les données importées viennent de l'extérieur (fichier, lien de partage) : visuels et géométrie contrôlés.
+          const isObject = (value: unknown) => Boolean(value) && typeof value === "object";
+          const items: BoardObject[] = Array.isArray(data.items)
+            ? data.items.filter(isObject).map((item: BoardObject) => ({ ...sanitizePlaced(item), layer: getBoardLayer(item) }))
+            : [];
+          const synopticNodes: SynopticNode[] = Array.isArray(data.synopticNodes)
+            ? data.synopticNodes.filter(isObject).map((node: SynopticNode) => ({
+              ...sanitizePlaced(node),
+              portsIn: Array.isArray(node.portsIn) ? node.portsIn : [],
+              portsOut: Array.isArray(node.portsOut) ? node.portsOut : [],
+            }))
+            : [];
+          const importedCatalog: CatalogItem[] = Array.isArray(data.catalog) ? data.catalog.filter(isObject).map((entry: CatalogItem) => sanitizeVisual(entry)) : [];
+          const background = data.planBackground && safeImage(data.planBackground.image)
+            ? {
+              ...data.planBackground,
+              image: safeImage(data.planBackground.image)!,
+              x: safeNumber(data.planBackground.x, 0),
+              y: safeNumber(data.planBackground.y, 0),
+              width: safeNumber(data.planBackground.width, 1200),
+              aspect: safeNumber(data.planBackground.aspect, 1.5) || 1.5,
+              opacity: Math.min(1, Math.max(0.05, safeNumber(data.planBackground.opacity, 0.55))),
+            }
+            : null;
           set({
-            title: data.title || "Sans titre",
+            title: typeof data.title === "string" && data.title.trim() ? data.title.slice(0, 120) : "Sans titre",
             status: data.status || "prep",
-            items: Array.isArray(data.items) ? data.items.map((item: BoardObject) => ({ ...item, layer: getBoardLayer(item) })) : [],
+            items,
             // Fusionne le catalogue importé avec l'actuel (l'importé l'emporte) : on ne perd jamais les objets existants.
-            catalog: Array.isArray(data.catalog)
-              ? [...get().catalog.filter((entry) => !data.catalog.some((incoming: CatalogItem) => incoming.id === entry.id)), ...data.catalog]
+            catalog: importedCatalog.length
+              ? [...get().catalog.filter((entry) => !importedCatalog.some((incoming) => incoming.id === entry.id)), ...importedCatalog]
               : get().catalog,
-            camera: data.camera || { x: 80, y: 40, zoom: 1 },
-            viewMode: data.viewMode || "plan",
-            synopticNodes: Array.isArray(data.synopticNodes) ? data.synopticNodes : [],
-            synopticLinks: Array.isArray(data.synopticNodes) && Array.isArray(data.synopticLinks) ? sanitizeLinks(data.synopticNodes, data.synopticLinks).links : [],
-            planBackground: data.planBackground?.image ? data.planBackground : null,
+            camera: data.camera && Number.isFinite(data.camera.zoom)
+              ? { x: safeNumber(data.camera.x, 80), y: safeNumber(data.camera.y, 40), zoom: Math.min(2.5, Math.max(0.25, data.camera.zoom)) }
+              : { x: 80, y: 40, zoom: 1 },
+            viewMode: data.viewMode === "synoptic" ? "synoptic" : "plan",
+            synopticNodes,
+            synopticLinks: Array.isArray(data.synopticLinks) ? sanitizeLinks(synopticNodes, data.synopticLinks.filter(isObject)).links : [],
+            planBackground: background,
             planBackgroundEditing: false,
             visibleLayers: { ...DEFAULT_VISIBLE_LAYERS, ...(data.visibleLayers || {}), accessories: data.visibleLayers?.accessories ?? data.visibleLayers?.data ?? true, lights: data.visibleLayers?.lights ?? data.visibleLayers?.power ?? true },
           });

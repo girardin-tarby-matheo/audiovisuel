@@ -1,5 +1,5 @@
 import { useState, useMemo, type ReactNode } from "react";
-import { Hand, MousePointer2, Minus, Plus, Maximize2, Search, X, Sparkles, SlidersHorizontal } from "lucide-react";
+import { Hand, MousePointer2, Minus, Plus, Maximize2, Search, X, Sparkles } from "lucide-react";
 import { CATEGORIES } from "../lib/catalog";
 import { ItemGlyph } from "./ItemGlyph";
 import { VisualAsset } from "./VisualAsset";

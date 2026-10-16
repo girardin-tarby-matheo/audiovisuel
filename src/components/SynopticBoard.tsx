@@ -23,7 +23,7 @@ import { CABLE_COLORS } from "../lib/constants";
 import { validateSynoptic } from "../lib/validation";
 import { synopticNodeWidth } from "../lib/synopticLayout";
 import { directedKey, linkGeometry, orient, pickPortOnNode, validTargets, type PortDirection } from "../lib/synopticLinks";
-import type { CableType, SynopticDeviceType, SynopticNode, SynopticPort } from "../lib/types";
+import type { CableType, SynopticNode, SynopticPort } from "../lib/types";
 
 
 // Removed local CABLE_COLORS constant as it is now imported from ../lib/constants
@@ -439,28 +439,33 @@ export function SynopticBoard() {
     }
   };
 
-  const onWheel = (e: React.WheelEvent) => {
-    if (e.ctrlKey || e.metaKey || !e.shiftKey) {
-      e.preventDefault();
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return;
-
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-
-      const worldX = (mouseX - pan.x) / zoom;
-      const worldY = (mouseY - pan.y) / zoom;
-
-      const zoomFactor = e.deltaY > 0 ? 0.92 : 1.08;
-      const nextZoom = Math.min(1.8, Math.max(0.4, zoom * zoomFactor));
-
+  // Molette : zoom centré sur le curseur ; Maj + molette : défilement horizontal.
+  // Écoutée en natif et non passive : React enregistre la molette en passif, ce qui empêche de bloquer
+  // le zoom du navigateur (Ctrl + molette, pincement sur pavé tactile zoomaient toute la page).
+  const viewRef = useRef({ pan, zoom });
+  viewRef.current = { pan, zoom };
+  useEffect(() => {
+    const board = containerRef.current;
+    if (!board) return;
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const { pan: currentPan, zoom: currentZoom } = viewRef.current;
+      if (event.shiftKey && !event.ctrlKey && !event.metaKey) {
+        setPan({ x: currentPan.x - (event.deltaY || event.deltaX), y: currentPan.y });
+        return;
+      }
+      const rect = board.getBoundingClientRect();
+      const mouseX = event.clientX - rect.left;
+      const mouseY = event.clientY - rect.top;
+      const worldX = (mouseX - currentPan.x) / currentZoom;
+      const worldY = (mouseY - currentPan.y) / currentZoom;
+      const nextZoom = Math.min(1.8, Math.max(0.3, currentZoom * (event.deltaY > 0 ? 0.92 : 1.08)));
       setZoom(nextZoom);
-      setPan({
-        x: mouseX - worldX * nextZoom,
-        y: mouseY - worldY * nextZoom,
-      });
-    }
-  };
+      setPan({ x: mouseX - worldX * nextZoom, y: mouseY - worldY * nextZoom });
+    };
+    board.addEventListener("wheel", onWheel, { passive: false });
+    return () => board.removeEventListener("wheel", onWheel);
+  }, []);
 
   // Démarrer un câble depuis un port (sortie ou entrée) : l'aperçu part du centre du port.
   const startLinking = (node: SynopticNode, port: SynopticPort, direction: PortDirection, e: React.PointerEvent) => {
@@ -862,7 +867,6 @@ export function SynopticBoard() {
         onPointerUp={onCanvasPointerUp}
         onPointerCancel={onCanvasPointerUp}
         onLostPointerCapture={onCanvasPointerUp}
-        onWheel={onWheel}
         onDragOver={(e) => e.preventDefault()}
         onDrop={onDrop}
         className={`synoptic-dots absolute inset-0 overflow-hidden ${spacePan || isPanning ? "cursor-grab active:cursor-grabbing" : marquee ? "cursor-crosshair" : "cursor-default"}`}

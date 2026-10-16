@@ -7,9 +7,8 @@ export function getStaticPaths() {
   return [{ params: { id: "preview" } }];
 }
 
-const { id } = Astro.params;
 ---
 
-<Layout title={`Partage ${id} — Shotboard Studio`}>
+<Layout title={`Projet partagé — Shotboard Studio`} description="Aperçu en lecture seule d'un plan de tournage partagé avec Shotboard Studio.">
   <ShareViewer client:load />
 </Layout>

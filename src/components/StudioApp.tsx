@@ -10,10 +10,18 @@ import { ShortcutsDialog } from "./ShortcutsDialog";
 import { useStudio } from "../store/studioStore";
 import { undo, redo } from "../store/history";
 import { GRID_SIZE } from "../lib/constants";
-import { saveToProjectLibrary, takePendingImport } from "../lib/shareImport";
+import { takePendingImport } from "../lib/shareImport";
+import { backupProject } from "../lib/projectLibrary";
 import { Clapperboard, MousePointer2, Hand, ZoomIn, ArrowRight, Undo2, Move } from "lucide-react";
 
 function WelcomeOverlay({ onDismiss }: { onDismiss: () => void }) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" || event.key === "Enter") onDismiss();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onDismiss]);
   return (
     <div className="animate-fade-in fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm">
       <div
@@ -46,6 +54,7 @@ function WelcomeOverlay({ onDismiss }: { onDismiss: () => void }) {
         </div>
         <button
           type="button"
+          autoFocus
           onClick={onDismiss}
           className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-300/90 py-3 text-sm font-semibold text-ink-950 transition hover:bg-[#fde68a]"
         >
@@ -141,9 +150,9 @@ export default function StudioApp() {
     const pending = takePendingImport();
     if (!pending) return;
     const state = useStudio.getState();
-    const saved = saveToProjectLibrary(`${state.title || "Projet sans titre"} (avant import)`, state.exportProject());
+    const saved = backupProject(state.title || "Projet sans titre", state.exportProject());
     state.importProject(pending);
-    state.setToast(saved ? "Projet partagé importé · l'ancien est dans « Projets » ✓" : "Projet partagé importé ✓");
+    state.setToast(saved ? "Projet partagé importé · l'ancien est dans la sauvegarde automatique (Projets) ✓" : "Projet partagé importé ✓");
   }, []);
 
   useEffect(() => {
@@ -166,6 +175,8 @@ export default function StudioApp() {
       }
       const mod = event.ctrlKey || event.metaKey;
       const key = event.key.toLowerCase();
+      // Une poignée de réglage (rotation, champ de vision, faisceau…) utilise elle-même les flèches.
+      if (key.startsWith("arrow") && (event.defaultPrevented || target?.closest('[role="slider"], .control-handle'))) return;
       const state = useStudio.getState();
       if (mod && key === "z") {
         event.preventDefault();
