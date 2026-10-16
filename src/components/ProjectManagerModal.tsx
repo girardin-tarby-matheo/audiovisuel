@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, FolderOpen, History, Plus, Save, Trash2, Upload, X } from "lucide-react";
+import { ClipboardCopy, Download, FileText, FolderOpen, History, Plus, Save, Trash2, Upload, X } from "lucide-react";
 import { useStudio } from "../store/studioStore";
+import { buildEquipmentList } from "../lib/equipmentList";
 import { backupProject, deleteProject, projectStats, readProjects, saveProject, type SavedProject } from "../lib/projectLibrary";
 
-function downloadJson(name: string, data: string) {
-    const blob = new Blob([data], { type: "application/json" });
+function downloadFile(name: string, data: string, extension: "json" | "txt") {
+    const blob = new Blob([data], { type: extension === "json" ? "application/json" : "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${name.replace(/[\\/:*?"<>|]+/g, "-") || "shotboard"}.json`;
+    link.download = `${name.replace(/[\\/:*?"<>|]+/g, "-") || "shotboard"}.${extension}`;
     link.click();
     URL.revokeObjectURL(url);
 }
@@ -38,6 +39,17 @@ export function ProjectManagerModal({ onClose }: { onClose: () => void }) {
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
     }, [onClose]);
+
+    const equipmentText = () => buildEquipmentList({ title: projectName, items, nodes: synopticNodes, links: synopticLinks });
+    const downloadEquipment = () => downloadFile(`${projectName} - materiel`, equipmentText(), "txt");
+    const copyEquipment = async () => {
+        try {
+            await navigator.clipboard.writeText(equipmentText());
+            setToast("Liste du matériel copiée ✓");
+        } catch {
+            setToast("Copie impossible : utilisez le téléchargement");
+        }
+    };
 
     /** Avant de remplacer le projet en cours, on le met de côté dans la sauvegarde automatique. */
     const backupCurrent = () => backupProject(projectName, exportProject());
@@ -107,8 +119,10 @@ export function ProjectManagerModal({ onClose }: { onClose: () => void }) {
 
                 <div className="mt-3 flex flex-wrap gap-2">
                     <button type="button" onClick={create} className="btn"><Plus size={14} /> Nouveau</button>
-                    <button type="button" onClick={() => downloadJson(projectName, exportProject())} className="btn"><Download size={14} /> Exporter JSON</button>
+                    <button type="button" onClick={() => downloadFile(projectName, exportProject(), "json")} className="btn"><Download size={14} /> Exporter JSON</button>
                     <button type="button" onClick={() => fileRef.current?.click()} className="btn"><Upload size={14} /> Importer JSON / CSV</button>
+                    <button type="button" onClick={downloadEquipment} className="btn" title="Télécharger la liste du matériel (texte)"><FileText size={14} /> Liste du matériel (.txt)</button>
+                    <button type="button" onClick={() => void copyEquipment()} className="btn px-2.5" title="Copier la liste du matériel" aria-label="Copier la liste du matériel"><ClipboardCopy size={14} /></button>
                     <input ref={fileRef} type="file" accept="application/json,.json,.csv,text/csv" className="hidden" onChange={(event) => { onFile(event.target.files?.[0]); event.target.value = ""; }} />
                 </div>
 
@@ -134,7 +148,7 @@ export function ProjectManagerModal({ onClose }: { onClose: () => void }) {
                                 </div>
                                 <div className="flex shrink-0 items-center gap-1">
                                     <button type="button" onClick={() => load(project)} title="Ouvrir" aria-label={`Ouvrir ${project.name}`} className="btn px-2.5 py-1.5"><FolderOpen size={14} /> Ouvrir</button>
-                                    <button type="button" onClick={() => downloadJson(project.name, project.data)} title="Télécharger en JSON" aria-label={`Télécharger ${project.name}`} className="rounded-lg p-2 text-slate-400 transition hover:bg-white/10 hover:text-white"><Download size={15} /></button>
+                                    <button type="button" onClick={() => downloadFile(project.name, project.data, "json")} title="Télécharger en JSON" aria-label={`Télécharger ${project.name}`} className="rounded-lg p-2 text-slate-400 transition hover:bg-white/10 hover:text-white"><Download size={15} /></button>
                                     <button type="button" onClick={() => remove(project)} title="Supprimer" aria-label={`Supprimer ${project.name}`} className="rounded-lg p-2 text-rose-300 transition hover:bg-white/10"><Trash2 size={15} /></button>
                                 </div>
                             </div>
